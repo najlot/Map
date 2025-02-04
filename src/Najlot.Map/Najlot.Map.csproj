@@ -6,7 +6,32 @@
     <Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
 		<IsPackable>true</IsPackable>
+		<Title>Map</Title>
+		<Version>0.0.1</Version>
+		<Authors>Najlot</Authors>
+		<Description>Map is a simple library to manage map methods.</Description>
+		<PackageProjectUrl>https://github.com/najlot/Map</PackageProjectUrl>
+		<PackageIcon>icon.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageTags>map;mapper;mapping;najlot</PackageTags>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\images\icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.1" />

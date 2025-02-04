@@ -1,15 +1,17 @@
-# MAP
+# ![M](images/icon.png) MAP
 Map is a simple library to manage map methods.
 
 ## NuGet Package
 This library is distributed as an NuGet package.
+```
 dotnet add package Najlot.Map
+```
 
 ### Quickstart
 Following classes should give you an idea how this library can be used.
 For more see unit tests or open an issue.
 
-´cs
+```csharp
 /// <summary>
 /// Class with methods for mapping User to UserModel and back.
 /// Only public methods are automatically registered.
@@ -58,4 +60,4 @@ public class UserService
 		UserRepository.Instance.UpdateUserData(model);
 	}
 }
-´
+```

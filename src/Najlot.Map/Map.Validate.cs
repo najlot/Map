@@ -102,9 +102,10 @@ public partial class Map
 			sb.AppendLine("Suggestion:");
 
 			var targetAssignment = string.IsNullOrEmpty(targetParameter.Name) ? "" : targetParameter.Name + ".";
+			var suffix = string.IsNullOrEmpty(targetParameter.Name) ? "," : ";";
 			foreach (var property in unmappedProperties.Where(p => sourceProperties.Contains(p)))
 			{
-				sb.AppendLine($"\t{targetAssignment}{property} = {sourceParameter.Name}.{property};");
+				sb.AppendLine($"\t{targetAssignment}{property} = {sourceParameter.Name}.{property}{suffix}");
 			}
 
 			foreach (var property in unmappedProperties.Where(p => !sourceProperties.Contains(p)))

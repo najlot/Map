@@ -15,7 +15,8 @@ public partial class Map : IMap
 	private readonly List<Delegate> _mapFactoryDelegates = [];
 
 	private FactoryMethod _factory = DefaultFactory;
-	private static object DefaultFactory(Type type) => Activator.CreateInstance(type);
+	private static object DefaultFactory(Type type) => Activator.CreateInstance(type)
+		?? throw new NullReferenceException($"Activator.CreateInstance of type {type.FullName} returns null.");
 
 	/// <summary>
 	/// Maps from a class.

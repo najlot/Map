@@ -47,6 +47,7 @@ internal class UserMapMethods
 public class UserService
 {
 	private readonly IMap map;
+	private readonly IUser _repository = GetUserRepositoryFromSomewhere();
 
 	public UserService()
 	{
@@ -66,8 +67,16 @@ public class UserService
 
 	public void UpdateUserData(User user)
 	{
+		// Map a single object.
 		var model = map.From(user).To<UserModel>();
-		UserRepository.Instance.UpdateUserData(model);
+		_repository.UpdateUserData(model);
+	}
+
+	public void UpdateUserData(User[] users)
+	{
+		// Map an IEnumerable of objects.
+		var models = map.From<User>(users).To<UserModel>();
+		_repository.UpdateUserData(models);
 	}
 }
 ```

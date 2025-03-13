@@ -94,7 +94,7 @@ public partial class Map
 
 		var unmappedProperties = targetType
 			.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty)
-			.Where(p => p.CanWrite)
+			.Where(p => p.CanWrite && p.SetMethod != null && p.SetMethod.IsPublic)
 			.Select(p => p.Name)
 			.Where(p => !(assignedProperties.Contains(p) || ignoredProperties.Contains(p)))
 			.ToArray();
@@ -125,7 +125,14 @@ public partial class Map
 
 			foreach (var property in unmappedProperties.Where(p => !sourceProperties.Contains(p)))
 			{
-				sb.AppendLine($"\t[MapIgnoreProperty(nameof({targetType.FullName}.{property}))]");
+				if (method.ReturnType == typeof(void))
+				{
+					sb.AppendLine($"\t[MapIgnoreProperty(nameof({targetParameter.Name}.{property}))]");
+				}
+				else
+				{
+					sb.AppendLine($"\t[MapIgnoreProperty(nameof({targetType.FullName}.{property}))]");
+				}
 			}
 
 			sb.AppendLine();

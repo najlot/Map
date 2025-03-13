@@ -2,14 +2,21 @@
 Map is a simple library to manage map methods.
 
 ## NuGet Package
-This library is distributed as an NuGet package.
+This library is distributed as a NuGet package.
 ```
 dotnet add package Najlot.Map
 ```
 
-### Quickstart
-Following classes should give you an idea how this library can be used.
-For more see unit tests or open an issue.
+## Features
+- Efficient and fast.
+- Debuggable mappings.
+- Supports complex mappings.
+- Flexible and easy to use.
+- Mapping validation and map assistance with the Map.Validate method.
+
+## Quickstart
+Following classes will give you an idea of how this library can be used.
+For more information, see the unit tests or open an issue.
 
 ```csharp
 /// <summary>
@@ -19,19 +26,22 @@ For more see unit tests or open an issue.
 /// </summary>
 internal class UserMapMethods
 {
-	[MapIgnoreProperty(nameof(User.Password))]
+	[MapIgnoreProperty(nameof(to.Password))]
 	public void MapModelToUser(UserModel from, User to)
 	{
 		to.Id = from.Id;
 		to.Username = from.Username;
 	}
 
-	[MapIgnoreProperty(nameof(UserModel.Password))]
+	[MapIgnoreProperty(nameof(to.Password))]
 	public UserModel MapUserToNewModel(User from) => new()
 	{
 		Id = from.Id,
 		Username = from.Username
 	};
+
+	[MapIgnoreMethod]
+	public Guid SomeMapToBeIgnored(UserModel from) => from.Id;
 }
 
 public class UserService
@@ -61,3 +71,8 @@ public class UserService
 	}
 }
 ```
+
+## When to use
+- When you want full control over your mappings.  
+- When other mappers approach is too "magical" for your needs.  
+- When you need a fast and lightweight but flexible solution.

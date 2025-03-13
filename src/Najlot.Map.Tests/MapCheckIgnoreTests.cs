@@ -15,8 +15,8 @@ public class MapCheckIgnoreTests
 
 	internal class IgnoreMapMethods
 	{
-		[MapIgnoreProperty(nameof(SessionModel.Id))]
-		[MapIgnoreProperty(nameof(SessionModel.User))]
+		[MapIgnoreProperty(nameof(to.Id))]
+		[MapIgnoreProperty(nameof(to.User))]
 		public static void IgnoreMapToModel(EmptyClass from, SessionModel to)
 		{
 		}
@@ -49,6 +49,6 @@ public class MapCheckIgnoreTests
 
 		// Act & Assert
 		var exception = Assert.Throws<MapMissPropertiesException>(() => map.Validate());
-		Assert.Contains($"[MapIgnoreProperty(nameof({typeof(UserModel).FullName}.Username))]", exception.Message);
+		Assert.Contains($"[MapIgnoreProperty(nameof(to.Username))]", exception.Message);
 	}
 }

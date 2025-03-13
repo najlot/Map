@@ -7,7 +7,7 @@
 	<LangVersion>latest</LangVersion>
 	<IsPackable>true</IsPackable>
 	<Title>Map</Title>
-	<Version>0.0.4</Version>
+	<Version>0.0.5</Version>
 	<Authors>Najlot</Authors>
 	<Description>Map is a simple library to manage map methods.</Description>
 	<PackageProjectUrl>https://github.com/najlot/Map</PackageProjectUrl>
@@ -34,7 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.1" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.3" />
   </ItemGroup>
 
 </Project>

@@ -53,4 +53,44 @@ internal class MapFromEnumerable<TFrom>(
 	{
 		return To<T>().ToList();
 	}
+
+	public List<T> ToList<T>(List<T> to)
+	{
+		var targetType = typeof(T);
+		int count;
+
+		if (!mapRegistrations.TryGetValue(targetType, out var registration))
+		{
+			throw new MapNotRegisteredException(typeof(TFrom), targetType);
+		}
+
+		var mapMethod = (MapMethod<TFrom, T>)registration;
+
+		if (from is System.Collections.ICollection collection)
+		{
+			count = collection.Count;
+		}
+		else
+		{
+			count = from.Count();
+		}
+
+		while (to.Count > count)
+		{
+			to.RemoveAt(to.Count - 1);
+		}
+
+		while (to.Count < count)
+		{
+			to.Add((T)factory(targetType));
+		}
+
+		int i = 0;
+		foreach (var f in from)
+		{
+			mapMethod(map, f, to[i++]);
+		}
+
+		return to;
+	}
 }

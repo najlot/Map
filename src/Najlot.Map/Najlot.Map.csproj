@@ -7,7 +7,7 @@
 	<LangVersion>latest</LangVersion>
 	<IsPackable>true</IsPackable>
 	<Title>Map</Title>
-	<Version>0.0.3</Version>
+	<Version>0.0.4</Version>
 	<Authors>Najlot</Authors>
 	<Description>Map is a simple library to manage map methods.</Description>
 	<PackageProjectUrl>https://github.com/najlot/Map</PackageProjectUrl>

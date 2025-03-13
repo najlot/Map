@@ -25,4 +25,13 @@ public interface IMapFromEnumerable
 	/// <typeparam name="T"></typeparam>
 	/// <returns></returns>
 	public T[] ToArray<T>();
+
+	/// <summary>
+	/// Maps provided IEnumerable into an existing List.
+	/// Does not work with map factories and modifies existing items.
+	/// </summary>
+	/// <typeparam name="T">Type of the elements in the list</typeparam>
+	/// <param name="to">List to map into</param>
+	/// <returns></returns>
+	List<T> ToList<T>(List<T> to);
 }

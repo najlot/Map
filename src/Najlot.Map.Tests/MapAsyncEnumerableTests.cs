@@ -72,7 +72,7 @@ public class MapAsyncEnumerableTests
 
 		await Task.Delay(1);
 	}
-	
+
 	[Fact]
 	public void Test_Map_With_Nullable_AsyncEnumerable()
 	{

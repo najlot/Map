@@ -21,11 +21,11 @@ public class MapCheckIgnoreTests
 		{
 		}
 
-        [MapIgnoreMethod]
-        public static void IgnoreMethod(Session from, SessionModel to)
-        {
-        }
-    }
+		[MapIgnoreMethod]
+		public static void IgnoreMethod(Session from, SessionModel to)
+		{
+		}
+	}
 
 	[Fact]
 	public void Map_Check_Must_Recognize_Ignore()

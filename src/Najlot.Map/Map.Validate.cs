@@ -12,13 +12,13 @@ public partial class Map
 	private bool HasIgnoreNethodAttribute(Delegate @delegate)
 	{
 		return @delegate.Method.CustomAttributes.Any(a => a.AttributeType == typeof(MapIgnoreMethodAttribute));
-    }
+	}
 
 	public void Validate()
 	{
 		var sb = new StringBuilder();
 
-        foreach (var @delegate in _mapDelegates)
+		foreach (var @delegate in _mapDelegates)
 		{
 			if (HasIgnoreNethodAttribute(@delegate))
 			{
@@ -30,12 +30,12 @@ public partial class Map
 
 		foreach (var @delegate in _mapFactoryDelegates)
 		{
-            if (HasIgnoreNethodAttribute(@delegate))
-            {
-                continue;
-            }
+			if (HasIgnoreNethodAttribute(@delegate))
+			{
+				continue;
+			}
 
-            CheckDelegate(@delegate, sb);
+			CheckDelegate(@delegate, sb);
 		}
 
 		if (sb.Length > 0)

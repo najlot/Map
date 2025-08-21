@@ -77,6 +77,7 @@ public partial class Map
 			if (convertToMapFactoryMethod.MakeGenericMethod(parameterTypes).Invoke(null, [simpleMapDelegate]) is Delegate mapDelegate)
 			{
 				RegisterIntoDictionary(_mapFactoryRegistrations, parameterTypes[0], parameterTypes[1], mapDelegate);
+				RegisterIntoDictionary(_simpleMapFactoryRegistrations, parameterTypes[0], parameterTypes[1], simpleMapDelegate);
 				_mapFactoryDelegates.Add(simpleMapDelegate);
 			}
 		}
@@ -122,6 +123,7 @@ public partial class Map
 			if (convertToMapMethod.MakeGenericMethod(parameterTypes).Invoke(null, [simpleMapDelegate]) is Delegate mapDelegate)
 			{
 				RegisterIntoDictionary(_mapRegistrations, parameterTypes[0], parameterTypes[1], mapDelegate);
+				RegisterIntoDictionary(_simpleMapRegistrations, parameterTypes[0], parameterTypes[1], simpleMapDelegate);
 				_mapDelegates.Add(simpleMapDelegate);
 			}
 		}

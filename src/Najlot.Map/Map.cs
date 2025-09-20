@@ -9,8 +9,6 @@ public partial class Map : IMap
 {
 	private readonly Dictionary<Type, Dictionary<Type, Delegate>> _mapRegistrations = [];
 	private readonly Dictionary<Type, Dictionary<Type, Delegate>> _mapFactoryRegistrations = [];
-	private readonly Dictionary<Type, Dictionary<Type, Delegate>> _simpleMapRegistrations = [];
-	private readonly Dictionary<Type, Dictionary<Type, Delegate>> _simpleMapFactoryRegistrations = [];
 	private readonly IReadOnlyDictionary<Type, Delegate> _emptyDictionary = new Dictionary<Type, Delegate>();
 
 	private readonly List<Delegate> _mapDelegates = [];
@@ -119,7 +117,6 @@ public partial class Map : IMap
 		TTo Map(IMap map, TFrom from) => method(from);
 
 		RegisterFactoryMapInternal<TFrom, TTo>(Map);
-		RegisterIntoDictionary(_simpleMapFactoryRegistrations, typeof(TFrom), typeof(TTo), method);
 		_mapFactoryDelegates.Add(method);
 		return this;
 	}
@@ -161,7 +158,6 @@ public partial class Map : IMap
 		}
 
 		RegisterInternal<TFrom, TTo>(Map);
-		RegisterIntoDictionary(_simpleMapRegistrations, typeof(TFrom), typeof(TTo), method);
 		_mapDelegates.Add(method);
 		return this;
 	}
@@ -219,12 +215,8 @@ public partial class Map : IMap
 	/// <returns>The simple map method if registered, otherwise null</returns>
 	public SimpleMapMethod<TFrom, TTo>? GetSimpleMapMethod<TFrom, TTo>()
 	{
-		if (_simpleMapRegistrations.TryGetValue(typeof(TFrom), out var registrations) &&
-			registrations.TryGetValue(typeof(TTo), out var method))
-		{
-			return (SimpleMapMethod<TFrom, TTo>)method;
-		}
-		return null;
+		// Return the last registered method for the type pair (last wins)
+		return _mapDelegates.OfType<SimpleMapMethod<TFrom, TTo>>().LastOrDefault();
 	}
 
 	/// <summary>
@@ -235,11 +227,7 @@ public partial class Map : IMap
 	/// <returns>The simple map factory method if registered, otherwise null</returns>
 	public SimpleMapFactoryMethod<TFrom, TTo>? GetSimpleMapFactoryMethod<TFrom, TTo>()
 	{
-		if (_simpleMapFactoryRegistrations.TryGetValue(typeof(TFrom), out var registrations) &&
-			registrations.TryGetValue(typeof(TTo), out var method))
-		{
-			return (SimpleMapFactoryMethod<TFrom, TTo>)method;
-		}
-		return null;
+		// Return the last registered method for the type pair (last wins)
+		return _mapFactoryDelegates.OfType<SimpleMapFactoryMethod<TFrom, TTo>>().LastOrDefault();
 	}
 }

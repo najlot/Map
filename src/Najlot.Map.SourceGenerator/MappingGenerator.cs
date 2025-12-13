@@ -336,16 +336,26 @@ public class MappingGenerator : IIncrementalGenerator
                 }
                 else
                 {
-                    // For reference types (objects), initialize if null and then map
+                    // For reference types (objects), handle null properly and use factory if available
                     var targetTypeDisplayString = targetPropertyType.ToDisplayString();
-                    // Remove nullable annotation for instantiation
-                    var targetTypeForInstantiation = targetTypeDisplayString.TrimEnd('?');
+                    // Remove nullable annotation for type parameter
+                    var targetTypeForFactory = targetTypeDisplayString.TrimEnd('?');
                     
-                    sb.AppendLine($"{indent}        if ({targetParamName}.{targetProperty.Name} == null)");
+                    sb.AppendLine($"{indent}        if ({sourceParamName}.{sourceProperty.Name} != null)");
                     sb.AppendLine($"{indent}        {{");
-                    sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = new {targetTypeForInstantiation}();");
+                    sb.AppendLine($"{indent}            if ({targetParamName}.{targetProperty.Name} == null)");
+                    sb.AppendLine($"{indent}            {{");
+                    sb.AppendLine($"{indent}                {targetParamName}.{targetProperty.Name} = {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To<{targetTypeForFactory}>();");
+                    sb.AppendLine($"{indent}            }}");
+                    sb.AppendLine($"{indent}            else");
+                    sb.AppendLine($"{indent}            {{");
+                    sb.AppendLine($"{indent}                {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To({targetParamName}.{targetProperty.Name});");
+                    sb.AppendLine($"{indent}            }}");
                     sb.AppendLine($"{indent}        }}");
-                    sb.AppendLine($"{indent}        {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To({targetParamName}.{targetProperty.Name});");
+                    sb.AppendLine($"{indent}        else");
+                    sb.AppendLine($"{indent}        {{");
+                    sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = null;");
+                    sb.AppendLine($"{indent}        }}");
                 }
             }
         }

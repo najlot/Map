@@ -1,3 +1,4 @@
+using Najlot.Map.Exceptions;
 using Najlot.Map.Tests.TestTypes;
 
 namespace Najlot.Map.Tests;
@@ -25,13 +26,11 @@ public class MapSimpleMethodRetrievalEdgeCaseTests
 		map.Register(secondMethod);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapMethod<User, UserModel>();
+		var retrievedMethod = map.GetMethod<User, UserModel>();
 		
 		// Assert
 		Assert.NotNull(retrievedMethod);
-		Assert.Same(secondMethod, retrievedMethod);
 		
-		// Verify behavior
 		var user = new User { Username = "test" };
 		var userModel = new UserModel();
 		retrievedMethod(user, userModel);
@@ -56,17 +55,13 @@ public class MapSimpleMethodRetrievalEdgeCaseTests
 		map.Register(mapMethods);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapMethod<User, UserModel>();
+		var retrievedMethod = map.GetMethod<User, UserModel>();
 		
 		// Assert
-		Assert.NotNull(retrievedMethod);
-		
-		// Verify behavior
 		var user = new User { Username = "test" };
 		var userModel = new UserModel();
 		retrievedMethod(user, userModel);
 		
-		// Should be class method, not inline method
 		Assert.Equal("test", userModel.Username);
 	}
 	
@@ -91,20 +86,16 @@ public class MapSimpleMethodRetrievalEdgeCaseTests
 		map.Register(modelToUser);
 		
 		// Act & Assert
-		var method1 = map.GetSimpleMapMethod<User, UserModel>();
-		var method2 = map.GetSimpleMapMethod<UserModel, User>();
-		var method3 = map.GetSimpleMapMethod<User, User>(); // Not registered
+		var method1 = map.GetMethod<User, UserModel>();
+		var method2 = map.GetMethod<UserModel, User>();
+		Assert.Throws<MapNotRegisteredException>(() => map.GetMethod<User, User>()); // Not registered
 		
 		Assert.NotNull(method1);
 		Assert.NotNull(method2);
-		Assert.Null(method3);
-		
-		Assert.Same(userToModel, method1);
-		Assert.Same(modelToUser, method2);
 	}
 	
 	[Fact]
-	public void Test_GetSimpleMapMethod_OnlyComplexMethodRegistered_ReturnsNull()
+	public void Test_GetSimpleMapMethod_OnlyComplexMethodRegistered()
 	{
 		// Arrange
 		IMap map = new Map();
@@ -114,12 +105,16 @@ public class MapSimpleMethodRetrievalEdgeCaseTests
 		{
 			to.Username = from.Username;
 		});
-		
+
 		// Act
-		var retrievedMethod = map.GetSimpleMapMethod<User, UserModel>();
-		
+		var retrievedMethod = map.GetMethod<User, UserModel>();
+
 		// Assert
-		Assert.Null(retrievedMethod);
+		var user = new User { Username = "test" };
+		var userModel = new UserModel();
+		retrievedMethod(user, userModel);
+
+		Assert.Equal("test", userModel.Username);
 	}
 	
 	internal class UserMapMethods

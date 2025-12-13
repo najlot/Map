@@ -101,12 +101,15 @@ public partial class Map
 
 		if (unmappedProperties.Length > 0)
 		{
+			var declaringTypeName = method.DeclaringType?.Name;
+			if (!string.IsNullOrEmpty(declaringTypeName)) declaringTypeName += ".";
+
 			var sourceProperties = sourceType
 				.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.GetProperty)
 				.Select(p => p.Name)
 				.ToArray();
 
-			sb.AppendLine($"Method {method.Name}({string.Join(", ", parameters.Select(p => p.ParameterType.FullName))}) does not map the following properties:");
+			sb.AppendLine($"Method {declaringTypeName}.{method.Name}({string.Join(", ", parameters.Select(p => $"{p.ParameterType.FullName} {p.Name}"))}) does not map the following properties:");
 
 			foreach (var property in unmappedProperties)
 			{

@@ -101,7 +101,7 @@ public interface IMap
 	/// <typeparam name="TFrom">Source type</typeparam>
 	/// <typeparam name="TTo">Destination type</typeparam>
 	/// <returns>The simple map method if registered, otherwise null</returns>
-	SimpleMapMethod<TFrom, TTo>? GetSimpleMapMethod<TFrom, TTo>();
+	SimpleMapMethod<TFrom, TTo> GetMethod<TFrom, TTo>();
 
 	/// <summary>
 	/// Gets a registered simple map factory method for the specified types.
@@ -109,7 +109,7 @@ public interface IMap
 	/// <typeparam name="TFrom">Source type</typeparam>
 	/// <typeparam name="TTo">Destination type</typeparam>
 	/// <returns>The simple map factory method if registered, otherwise null</returns>
-	SimpleMapFactoryMethod<TFrom, TTo>? GetSimpleMapFactoryMethod<TFrom, TTo>();
+	SimpleMapFactoryMethod<TFrom, TTo> GetFactoryMethod<TFrom, TTo>();
 
 	/// <summary>
 	/// Validates map methods and throws an exception if any of them miss some properties.

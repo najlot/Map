@@ -14,7 +14,7 @@ public class MapSimpleMethodRetrievalStaticTests
 		map.Register(mapMethods);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapMethod<int, User>();
+		var retrievedMethod = map.GetMethod<int, User>();
 		
 		// Assert
 		Assert.NotNull(retrievedMethod);
@@ -36,7 +36,7 @@ public class MapSimpleMethodRetrievalStaticTests
 		map.Register(mapMethods);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapFactoryMethod<int, User>();
+		var retrievedMethod = map.GetFactoryMethod<int, User>();
 		
 		// Assert
 		Assert.NotNull(retrievedMethod);

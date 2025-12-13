@@ -1,3 +1,4 @@
+using Najlot.Map.Exceptions;
 using Najlot.Map.Tests.TestTypes;
 
 namespace Najlot.Map.Tests;
@@ -18,11 +19,13 @@ public class MapSimpleMethodRetrievalTests
 		map.Register(expectedMethod);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapMethod<User, UserModel>();
-		
+		var mapMethod = map.GetMethod<User, UserModel>();
+		var user = new User { Username = "test" };
+		var userModel = new UserModel { Username = "old test" };
+		mapMethod(user, userModel);
+
 		// Assert
-		Assert.NotNull(retrievedMethod);
-		Assert.Same(expectedMethod, retrievedMethod);
+		Assert.Equal("test", userModel.Username);
 	}
 	
 	[Fact]
@@ -35,12 +38,9 @@ public class MapSimpleMethodRetrievalTests
 		map.Register(mapMethods);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapMethod<User, UserModel>();
+		var retrievedMethod = map.GetMethod<User, UserModel>();
 		
 		// Assert
-		Assert.NotNull(retrievedMethod);
-		
-		// Test that the retrieved method works correctly
 		var user = new User { Username = "test" };
 		var userModel = new UserModel();
 		retrievedMethod(user, userModel);
@@ -49,16 +49,13 @@ public class MapSimpleMethodRetrievalTests
 	}
 	
 	[Fact]
-	public void Test_GetSimpleMapMethod_NotRegistered_ReturnsNull()
+	public void Test_GetSimpleMapMethod_NotRegistered_throws_MapNotRegisteredException()
 	{
 		// Arrange
 		IMap map = new Map();
-		
-		// Act
-		var retrievedMethod = map.GetSimpleMapMethod<User, UserModel>();
-		
-		// Assert
-		Assert.Null(retrievedMethod);
+
+		// Act & Assert
+		Assert.Throws<MapNotRegisteredException>(() => map.GetMethod<User, UserModel>());
 	}
 	
 	[Fact]
@@ -75,11 +72,12 @@ public class MapSimpleMethodRetrievalTests
 		map.Register(expectedMethod);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapFactoryMethod<User, UserModel>();
-		
+		var mapFactoryMethod = map.GetFactoryMethod<User, UserModel>();
+		var user = new User { Username = "test" };
+		UserModel userModel = mapFactoryMethod(user);
+
 		// Assert
-		Assert.NotNull(retrievedMethod);
-		Assert.Same(expectedMethod, retrievedMethod);
+		Assert.Equal("test", userModel.Username);
 	}
 	
 	[Fact]
@@ -92,7 +90,7 @@ public class MapSimpleMethodRetrievalTests
 		map.Register(mapMethods);
 		
 		// Act
-		var retrievedMethod = map.GetSimpleMapFactoryMethod<int, UserModel>();
+		var retrievedMethod = map.GetFactoryMethod<int, UserModel>();
 		
 		// Assert
 		Assert.NotNull(retrievedMethod);
@@ -104,16 +102,13 @@ public class MapSimpleMethodRetrievalTests
 	}
 	
 	[Fact]
-	public void Test_GetSimpleMapFactoryMethod_NotRegistered_ReturnsNull()
+	public void Test_GetSimpleMapFactoryMethod_NotRegistered_throws_MapNotRegisteredException()
 	{
 		// Arrange
 		IMap map = new Map();
-		
-		// Act
-		var retrievedMethod = map.GetSimpleMapFactoryMethod<User, UserModel>();
-		
-		// Assert
-		Assert.Null(retrievedMethod);
+
+		// Act & Assert
+		Assert.Throws<MapNotRegisteredException>(() => map.GetFactoryMethod<User, UserModel>());
 	}
 	
 	[Fact]
@@ -127,12 +122,12 @@ public class MapSimpleMethodRetrievalTests
 			to.Username = from.Username + "_mapped";
 		});
 		
-		var retrievedMethod = map.GetSimpleMapMethod<User, UserModel>();
+		var mapMethod = map.GetMethod<User, UserModel>();
 		
 		// Act
 		var user = new User { Username = "original" };
 		var userModel = new UserModel();
-		retrievedMethod!(user, userModel);
+		mapMethod(user, userModel);
 		
 		// Assert
 		Assert.Equal("original_mapped", userModel.Username);
@@ -149,11 +144,11 @@ public class MapSimpleMethodRetrievalTests
 			Username = from.Username + "_factory"
 		});
 		
-		var retrievedMethod = map.GetSimpleMapFactoryMethod<User, UserModel>();
+		var mapFactoryMethod = map.GetFactoryMethod<User, UserModel>();
 		
 		// Act
 		var user = new User { Username = "original" };
-		var result = retrievedMethod!(user);
+		var result = mapFactoryMethod(user);
 		
 		// Assert
 		Assert.Equal("original_factory", result.Username);

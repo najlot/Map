@@ -213,6 +213,22 @@ public class MappingGenerator : IIncrementalGenerator
 
         var sourceType = sourceParam.Type;
         var targetType = targetParam.Type;
+        var containingType = method.ContainingType;
+
+        // Get ignored properties from MapIgnoreProperty attributes
+        var ignoredProperties = new HashSet<string>();
+        foreach (var attr in method.GetAttributes())
+        {
+            if (attr.AttributeClass?.Name == "MapIgnorePropertyAttribute" || 
+                attr.AttributeClass?.Name == "MapIgnoreProperty")
+            {
+                if (attr.ConstructorArguments.Length > 0 && 
+                    attr.ConstructorArguments[0].Value is string propertyName)
+                {
+                    ignoredProperties.Add(propertyName);
+                }
+            }
+        }
 
         // Get properties from source and target types
         var sourceProperties = sourceType.GetMembers()
@@ -243,7 +259,13 @@ public class MappingGenerator : IIncrementalGenerator
                 continue;
             }
 
-            GeneratePropertyMapping(sourceProp, targetProp, sourceParam.Name, targetParam.Name, mapParam.Name, sb, indent);
+            // Check if this property should be ignored
+            if (ignoredProperties.Contains(targetProp.Name))
+            {
+                continue;
+            }
+
+            GeneratePropertyMapping(sourceProp, targetProp, sourceParam.Name, targetParam.Name, mapParam.Name, containingType, sb, indent);
         }
 
         sb.AppendLine($"{indent}    }}");
@@ -256,6 +278,7 @@ public class MappingGenerator : IIncrementalGenerator
         string sourceParamName,
         string targetParamName,
         string mapParamName,
+        INamedTypeSymbol containingType,
         StringBuilder sb,
         string indent)
     {
@@ -270,8 +293,14 @@ public class MappingGenerator : IIncrementalGenerator
         }
         else
         {
-            // Use IMap for complex types or collections
-            if (IsCollectionType(sourcePropertyType) && IsCollectionType(targetPropertyType))
+            // Check for custom mapping method in the containing class
+            var customMapMethod = FindCustomMappingMethod(containingType, sourcePropertyType, targetPropertyType);
+            if (customMapMethod is not null)
+            {
+                // Use custom mapping method
+                sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {customMapMethod.Name}({sourceParamName}.{sourceProperty.Name});");
+            }
+            else if (IsCollectionType(sourcePropertyType) && IsCollectionType(targetPropertyType))
             {
                 // For collections, use IMap.From().ToList() or ToArray()
                 var sourceElementType = GetCollectionElementType(sourcePropertyType);
@@ -299,10 +328,49 @@ public class MappingGenerator : IIncrementalGenerator
             }
             else
             {
-                // For single objects, use IMap.From().To()
-                sb.AppendLine($"{indent}        {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To({targetParamName}.{targetProperty.Name});");
+                // For single objects, check if target is a value type or can be assigned
+                if (targetPropertyType.IsValueType)
+                {
+                    // For value types, we need to create and assign
+                    sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To<{targetPropertyType.ToDisplayString()}>();");
+                }
+                else
+                {
+                    // For reference types (objects), initialize if null and then map
+                    var targetTypeDisplayString = targetPropertyType.ToDisplayString();
+                    // Remove nullable annotation for instantiation
+                    var targetTypeForInstantiation = targetTypeDisplayString.TrimEnd('?');
+                    
+                    sb.AppendLine($"{indent}        if ({targetParamName}.{targetProperty.Name} == null)");
+                    sb.AppendLine($"{indent}        {{");
+                    sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = new {targetTypeForInstantiation}();");
+                    sb.AppendLine($"{indent}        }}");
+                    sb.AppendLine($"{indent}        {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To({targetParamName}.{targetProperty.Name});");
+                }
             }
         }
+    }
+
+    private static IMethodSymbol? FindCustomMappingMethod(INamedTypeSymbol containingType, ITypeSymbol sourceType, ITypeSymbol targetType)
+    {
+        // Look for a method with signature: TTarget MapFrom(TSource source)
+        var methods = containingType.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Where(m => m.Name == "MapFrom" 
+                     && !m.IsPartialDefinition
+                     && m.Parameters.Length == 1
+                     && !m.ReturnsVoid);
+
+        foreach (var method in methods)
+        {
+            if (SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, sourceType) &&
+                SymbolEqualityComparer.Default.Equals(method.ReturnType, targetType))
+            {
+                return method;
+            }
+        }
+
+        return null;
     }
 
     private static bool CanDirectlyAssign(ITypeSymbol sourceType, ITypeSymbol targetType)
@@ -373,6 +441,73 @@ public class MappingGenerator : IIncrementalGenerator
             return; // Method must be in a partial class
         }
 
+        // Check if method is partial
+        if (!methodSymbol.IsPartialDefinition)
+        {
+            return; // Only partial methods are supported
+        }
+
+        var parameters = methodSymbol.Parameters;
+
+        // Handle two cases:
+        // 1. void MapFrom(IMap map, TSource from, TTarget to) - 3 parameters
+        // 2. TTarget MapToTarget(TSource source) - 1 parameter with return type
+        
+        if (parameters.Length == 3 && methodSymbol.ReturnsVoid && methodSymbol.Name == "MapFrom")
+        {
+            // This is a method-level [Mapping] attribute on a void MapFrom method
+            // Generate it the same way as class-level mappings
+            GenerateMappingForMethodWithThreeParams(methodSymbol, context);
+        }
+        else if (parameters.Length == 1 && !methodSymbol.ReturnsVoid)
+        {
+            // This is a method-level [Mapping] attribute on a method with return type
+            GenerateMappingForMethodWithOneParam(methodSymbol, context);
+        }
+    }
+
+    private static void GenerateMappingForMethodWithThreeParams(IMethodSymbol methodSymbol, SourceProductionContext context)
+    {
+        var containingClass = methodSymbol.ContainingType;
+        var namespaceName = containingClass.ContainingNamespace.IsGlobalNamespace
+            ? null
+            : containingClass.ContainingNamespace.ToDisplayString();
+
+        var className = containingClass.Name;
+        var fullClassName = containingClass.ToDisplayString();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("// <auto-generated/>");
+        sb.AppendLine("#nullable enable");
+        sb.AppendLine();
+
+        if (namespaceName is not null)
+        {
+            sb.AppendLine($"namespace {namespaceName}");
+            sb.AppendLine("{");
+        }
+
+        var indent = namespaceName is not null ? "    " : "";
+
+        sb.AppendLine($"{indent}partial class {className}");
+        sb.AppendLine($"{indent}{{");
+
+        GenerateMapFromImplementation(methodSymbol, sb, indent);
+
+        sb.AppendLine($"{indent}}}");
+
+        if (namespaceName is not null)
+        {
+            sb.AppendLine("}");
+        }
+
+        var fileName = $"{fullClassName.Replace("<", "_").Replace(">", "_").Replace(".", "_")}_{methodSymbol.Name}_{methodSymbol.Parameters[1].Type.Name}_{methodSymbol.Parameters[2].Type.Name}.g.cs";
+        context.AddSource(fileName, sb.ToString());
+    }
+
+    private static void GenerateMappingForMethodWithOneParam(IMethodSymbol methodSymbol, SourceProductionContext context)
+    {
+        var containingClass = methodSymbol.ContainingType;
         var namespaceName = containingClass.ContainingNamespace.IsGlobalNamespace
             ? null
             : containingClass.ContainingNamespace.ToDisplayString();
@@ -380,26 +515,9 @@ public class MappingGenerator : IIncrementalGenerator
         var className = containingClass.Name;
         var methodName = methodSymbol.Name;
 
-        // Check if method is partial
-        if (!methodSymbol.IsPartialDefinition)
-        {
-            return; // Only partial methods are supported
-        }
-
-        // Get method signature
         var parameters = methodSymbol.Parameters;
-        if (parameters.Length != 1)
-        {
-            return; // Only methods with single parameter are supported
-        }
-
         var sourceType = parameters[0].Type;
         var targetType = methodSymbol.ReturnType;
-
-        if (targetType.SpecialType == SpecialType.System_Void)
-        {
-            return; // Must return a type
-        }
 
         var sourceProperties = sourceType.GetMembers()
             .OfType<IPropertySymbol>()

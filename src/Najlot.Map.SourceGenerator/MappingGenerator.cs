@@ -151,11 +151,10 @@ public class MappingGenerator : IIncrementalGenerator
         var className = classSymbol.Name;
         var fullClassName = classSymbol.ToDisplayString();
 
-        // Find all partial methods in the class with signature: partial void MapFrom(IMap map, TSource from, TTarget to)
+        // Find all partial methods in the class with signature: partial void MethodName(IMap map, TSource from, TTarget to)
         var partialMethods = classSymbol.GetMembers()
             .OfType<IMethodSymbol>()
             .Where(m => m.IsPartialDefinition 
-                     && m.Name == "MapFrom" 
                      && m.ReturnsVoid
                      && m.Parameters.Length == 3)
             .ToList();
@@ -246,8 +245,9 @@ public class MappingGenerator : IIncrementalGenerator
         var mapTypeName = mapParam.Type.ToDisplayString();
         var sourceTypeName = sourceType.ToDisplayString();
         var targetTypeName = targetType.ToDisplayString();
+        var methodName = method.Name;
 
-        sb.AppendLine($"{indent}    {accessibility} partial void MapFrom({mapTypeName} {mapParam.Name}, {sourceTypeName} {sourceParam.Name}, {targetTypeName} {targetParam.Name})");
+        sb.AppendLine($"{indent}    {accessibility} partial void {methodName}({mapTypeName} {mapParam.Name}, {sourceTypeName} {sourceParam.Name}, {targetTypeName} {targetParam.Name})");
         sb.AppendLine($"{indent}    {{");
 
         // Generate mapping logic for each matching property
@@ -363,11 +363,10 @@ public class MappingGenerator : IIncrementalGenerator
 
     private static IMethodSymbol? FindCustomMappingMethod(INamedTypeSymbol containingType, ITypeSymbol sourceType, ITypeSymbol targetType)
     {
-        // Look for a method with signature: TTarget MapFrom(TSource source)
+        // Look for a method with signature: TTarget MethodName(TSource source)
         var methods = containingType.GetMembers()
             .OfType<IMethodSymbol>()
-            .Where(m => m.Name == "MapFrom" 
-                     && !m.IsPartialDefinition
+            .Where(m => !m.IsPartialDefinition
                      && m.Parameters.Length == 1
                      && !m.ReturnsVoid);
 
@@ -460,12 +459,12 @@ public class MappingGenerator : IIncrementalGenerator
         var parameters = methodSymbol.Parameters;
 
         // Handle two cases:
-        // 1. void MapFrom(IMap map, TSource from, TTarget to) - 3 parameters
-        // 2. TTarget MapToTarget(TSource source) - 1 parameter with return type
+        // 1. void MethodName(IMap map, TSource from, TTarget to) - 3 parameters
+        // 2. TTarget MethodName(TSource source) - 1 parameter with return type
         
-        if (parameters.Length == 3 && methodSymbol.ReturnsVoid && methodSymbol.Name == "MapFrom")
+        if (parameters.Length == 3 && methodSymbol.ReturnsVoid)
         {
-            // This is a method-level [Mapping] attribute on a void MapFrom method
+            // This is a method-level [Mapping] attribute on a void method with 3 params
             // Generate it the same way as class-level mappings
             GenerateMappingForMethodWithThreeParams(methodSymbol, context);
         }

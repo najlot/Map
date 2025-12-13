@@ -95,14 +95,14 @@ public partial class UserMappingMethods
 {
 	[Mapping]
 	[MapIgnoreProperty(nameof(to.CurrentSessionId))]
-	public partial void MapFrom(IMap map, TestUserModel from, TestUser to);
+	public partial void UserModelToUser(IMap map, TestUserModel from, TestUser to);
 
 	[Mapping]
-	public partial void MapFrom(IMap map, TestUserFeatureModel from, TestUserFeature to);
+	public partial void FeatureModelToFeature(IMap map, TestUserFeatureModel from, TestUserFeature to);
 
 	[Mapping]
-	public partial void MapFrom(IMap map, TestUserAddressModel from, TestUserAddress to);
+	public partial void AddressModelToAddress(IMap map, TestUserAddressModel from, TestUserAddress to);
 
 	// Additional mapping method for DateTimeOffset to DateTime
-	public DateTime MapFrom(DateTimeOffset from) => from.UtcDateTime;
+	public DateTime MapOffsetToUtcDateTime(DateTimeOffset from) => from.UtcDateTime;
 }

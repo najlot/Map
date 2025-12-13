@@ -96,10 +96,10 @@ public class PartialClassMappingTests
 public partial class UserMappings
 {
 	[MapIgnoreProperty(nameof(to.CurrentSessionId))]
-	public partial void MapFrom(IMap map, TestUserModel from, TestUser to);
-	public partial void MapFrom(IMap map, TestUserFeatureModel from, TestUserFeature to);
-	public partial void MapFrom(IMap map, TestUserAddressModel from, TestUserAddress to);
+	public partial void MapUser(IMap map, TestUserModel from, TestUser to);
+	public partial void MapFeature(IMap map, TestUserFeatureModel from, TestUserFeature to);
+	public partial void MapAddress(IMap map, TestUserAddressModel from, TestUserAddress to);
 
 	// Additional mapping method for DateTimeOffset to DateTime
-	public DateTime MapFrom(DateTimeOffset from) => from.UtcDateTime;
+	public DateTime MapOffsetToUtcDateTime(DateTimeOffset from) => from.UtcDateTime;
 }

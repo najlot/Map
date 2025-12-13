@@ -29,8 +29,8 @@ src/
 
 ## Target Frameworks
 
-- **Main Library**: .NET Standard 2.0 and .NET 8.0
-- **Tests**: .NET 9.0 (currently incompatible with .NET 8.0 SDK in CI)
+- **Main Library**: .NET Standard 2.0 and .NET 10.0
+- **Tests**: .NET 10.0 (install .NET 10.0 SDK)
 
 ## Core Concepts and Patterns
 
@@ -167,8 +167,8 @@ public void Test_Simple_Map()
 ## Build and Development
 
 ### Prerequisites
-- .NET 8.0 SDK (tests currently target .NET 9.0)
-- Visual Studio 2022 or compatible IDE
+- .NET 10.0 SDK (tests target .NET 10.0)
+- Visual Studio 2026 or compatible IDE
 
 ### Building
 ```bash
@@ -190,12 +190,12 @@ dotnet test
 ## Dependencies
 
 ### Main Library
-- `Microsoft.Bcl.AsyncInterfaces` (9.0.3) - for async enumerable support
+- `Microsoft.Bcl.AsyncInterfaces` - for async enumerable support
 
 ### Test Project
-- `xunit` (2.9.3) - testing framework
-- `Microsoft.NET.Test.Sdk` (17.13.0) - test SDK
-- `coverlet.collector` (6.0.4) - code coverage
+- `xunit` - testing framework
+- `Microsoft.NET.Test.Sdk` - test SDK
+- `coverlet.collector` - code coverage
 
 ## Common Use Cases
 

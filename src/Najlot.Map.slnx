@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="../.editorconfig" />
+    <File Path="../.gitignore" />
+    <File Path="../LICENSE" />
+    <File Path="../README.md" />
+  </Folder>
+  <Project Path="Najlot.Map/Najlot.Map.csproj" />
+  <Project Path="Najlot.Map.Tests/Najlot.Map.Tests.csproj" />
+  <Project Path="Najlot.Map.SourceGenerator/Najlot.Map.SourceGenerator.csproj" />
+  <Project Path="Najlot.Map.SourceGenerator.Tests/Najlot.Map.SourceGenerator.Tests.csproj" />
+</Solution>

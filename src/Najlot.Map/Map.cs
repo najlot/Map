@@ -206,4 +206,53 @@ public partial class Map : IMap
 		_factory = factory;
 		return this;
 	}
+
+	/// <summary>
+	/// Gets a registered simple map method for the specified types.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <returns>The simple map method if registered, otherwise null</returns>
+	public SimpleMapMethod<TFrom, TTo> GetMethod<TFrom, TTo>()
+	{
+		if (_mapRegistrations.TryGetValue(typeof(TFrom), out var registrations)
+			&& registrations.TryGetValue(typeof(TTo), out var registration))
+		{
+			var method = (MapMethod<TFrom, TTo>)registration;
+			return (TFrom from, TTo to) => method(this, from, to);
+		}
+
+		throw new MapNotRegisteredException(typeof(TFrom), typeof(TTo));
+	}
+
+	/// <summary>
+	/// Gets a registered simple map factory method for the specified types.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <returns>The simple map factory method if registered, otherwise null</returns>
+	public SimpleMapFactoryMethod<TFrom, TTo> GetFactoryMethod<TFrom, TTo>()
+	{
+		var factory = _factory;
+		if (_mapFactoryRegistrations.TryGetValue(typeof(TFrom), out var factoryRegistrations)
+			&& factoryRegistrations.TryGetValue(typeof(TTo), out var factoryRegistration))
+		{
+			var factoryMethod = (MapFactoryMethod<TFrom, TTo>)factoryRegistration;
+			return (TFrom from) => factoryMethod(this, from);
+		}
+
+		if (_mapRegistrations.TryGetValue(typeof(TFrom), out var registrations)
+			&& registrations.TryGetValue(typeof(TTo), out var registration))
+		{
+			var method = (MapMethod<TFrom, TTo>)registration;
+			return (TFrom from) =>
+			{
+				var to = (TTo)factory(typeof(TTo));
+				method(this, from, to);
+				return to;
+			};
+		}
+
+		throw new MapNotRegisteredException(typeof(TFrom), typeof(TTo));
+	}
 }

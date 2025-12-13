@@ -1,6 +1,6 @@
 # Complete Working Example
 
-This is a complete, working example demonstrating the Najlot.Map.SourceGenerator in action.
+This is a complete, working example demonstrating the Najlot.Map.SourceGenerator with IMap integration.
 
 ## Project Setup
 
@@ -9,7 +9,8 @@ This is a complete, working example demonstrating the Najlot.Map.SourceGenerator
 dotnet new console -n MapGeneratorDemo
 cd MapGeneratorDemo
 
-# Add the source generator package
+# Add both packages
+dotnet add package Najlot.Map
 dotnet add package Najlot.Map.SourceGenerator
 ```
 
@@ -20,50 +21,76 @@ using Najlot.Map.SourceGenerator;
 
 namespace MapGeneratorDemo;
 
-// Domain entity with [Mapping] attribute
-[Mapping]
-public partial class User
+// Domain entities
+public class User
 {
     public Guid Id { get; set; }
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
+    public DateTime RegisteredAt { get; set; }
     public bool IsActive { get; set; }
+    public Address? Address { get; set; }
+    public List<Feature> Features { get; set; } = new();
 }
 
-// DTO for API responses
-public class UserDto
+public class Address
+{
+    public string Street { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public string ZipCode { get; set; } = string.Empty;
+}
+
+public class Feature
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+}
+
+// Models with different types
+public class UserModel
 {
     public Guid Id { get; set; }
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
+    public DateTimeOffset RegisteredAt { get; set; }
     public bool IsActive { get; set; }
+    public AddressModel? Address { get; set; }
+    public List<FeatureModel> Features { get; set; } = new();
 }
 
-// Request model for creating users
-public class CreateUserRequest
+public class AddressModel
 {
-    public string Username { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
+    public string Street { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public string ZipCode { get; set; } = string.Empty;
+}
+
+public class FeatureModel
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 }
 ```
 
 ## Mappers.cs
 
 ```csharp
+using Najlot.Map;
 using Najlot.Map.SourceGenerator;
 
 namespace MapGeneratorDemo;
 
-// Mapper class with partial methods
-public partial class UserMapper
+// Class-level mapping - generates implementations for all partial methods
+[Mapping]
+public partial class UserMappings
 {
-    [Mapping]
-    public partial UserDto MapToDto(User user);
+    // Use meaningful names - any name works!
+    public partial void MapUser(IMap map, UserModel from, User to);
+    public partial void MapAddress(IMap map, AddressModel from, Address to);
+    public partial void MapFeature(IMap map, FeatureModel from, Feature to);
     
-    [Mapping]
-    public partial User MapFromRequest(CreateUserRequest request);
+    // Custom type converter - automatically detected and used
+    public DateTime ConvertDateTimeOffset(DateTimeOffset offset) => offset.UtcDateTime;
 }
 ```
 
@@ -71,132 +98,142 @@ public partial class UserMapper
 
 ```csharp
 using MapGeneratorDemo;
+using Najlot.Map;
 
-var mapper = new UserMapper();
+// Setup the map with factory registration
+var map = new Map()
+    .Register<UserMappings>()
+    .RegisterFactory(type =>
+    {
+        if (type == typeof(Address)) return new Address();
+        if (type == typeof(Feature)) return new Feature();
+        throw new InvalidOperationException($"No factory for {type}");
+    });
 
-// Example 1: Create a user from request
-Console.WriteLine("=== Example 1: Mapping from CreateUserRequest ===");
-var request = new CreateUserRequest
+// Example 1: Map complex object with nested properties
+Console.WriteLine("=== Example 1: Complex Mapping with Nested Objects ===");
+var userModel = new UserModel
 {
+    Id = Guid.NewGuid(),
     Username = "johndoe",
-    Email = "john@example.com"
+    Email = "john@example.com",
+    RegisteredAt = DateTimeOffset.UtcNow,
+    IsActive = true,
+    Address = new AddressModel
+    {
+        Street = "123 Main St",
+        City = "Springfield",
+        ZipCode = "12345"
+    },
+    Features = new List<FeatureModel>
+    {
+        new() { Code = "F001", Name = "Premium" },
+        new() { Code = "F002", Name = "Analytics" }
+    }
 };
 
-var user = mapper.MapFromRequest(request);
-user.Id = Guid.NewGuid();
-user.CreatedAt = DateTime.UtcNow;
-user.IsActive = true;
+var user = new User();
+map.From(userModel).To(user);
 
-Console.WriteLine($"Created User: {user.Username} ({user.Email})");
-Console.WriteLine($"  ID: {user.Id}");
-Console.WriteLine($"  Created: {user.CreatedAt}");
+Console.WriteLine($"User: {user.Username} ({user.Email})");
+Console.WriteLine($"  Registered: {user.RegisteredAt}");
 Console.WriteLine($"  Active: {user.IsActive}");
+Console.WriteLine($"  Address: {user.Address?.Street}, {user.Address?.City}");
+Console.WriteLine($"  Features: {string.Join(", ", user.Features.Select(f => f.Name))}");
 
-// Example 2: Convert to DTO
-Console.WriteLine("\n=== Example 2: Mapping to UserDto ===");
-var dto = mapper.MapToDto(user);
-Console.WriteLine($"DTO: {dto.Username} ({dto.Email})");
-Console.WriteLine($"  ID: {dto.Id}");
-Console.WriteLine($"  Created: {dto.CreatedAt}");
-Console.WriteLine($"  Active: {dto.IsActive}");
-
-// Example 3: Clone a user using MapFrom
-Console.WriteLine("\n=== Example 3: Cloning with MapFrom ===");
-var clonedUser = new User();
-clonedUser.MapFrom(user);
-clonedUser.Id = Guid.NewGuid(); // Give it a new ID
-
-Console.WriteLine($"Cloned User: {clonedUser.Username} ({clonedUser.Email})");
-Console.WriteLine($"  Original ID: {user.Id}");
-Console.WriteLine($"  Cloned ID: {clonedUser.Id}");
-
-// Example 4: Demonstrating performance
-Console.WriteLine("\n=== Example 4: Performance Test ===");
-var sw = System.Diagnostics.Stopwatch.StartNew();
-for (int i = 0; i < 1_000_000; i++)
+// Example 2: Factory usage demonstration
+Console.WriteLine("\n=== Example 2: Factory Usage ===");
+var userModel2 = new UserModel
 {
-    var tempDto = mapper.MapToDto(user);
-}
-sw.Stop();
-Console.WriteLine($"Mapped 1,000,000 objects in {sw.ElapsedMilliseconds}ms");
-Console.WriteLine($"Average: {sw.ElapsedMilliseconds / 1_000_000.0}ms per mapping");
+    Id = Guid.NewGuid(),
+    Username = "janedoe",
+    Email = "jane@example.com",
+    RegisteredAt = DateTimeOffset.UtcNow,
+    Address = new AddressModel { Street = "456 Oak Ave", City = "Shelbyville" }
+};
+
+var user2 = new User();
+map.From(userModel2).To(user2);
+Console.WriteLine($"Address created via factory: {user2.Address?.Street}");
+
+// Example 3: Null handling
+Console.WriteLine("\n=== Example 3: Null Handling ===");
+var userModel3 = new UserModel
+{
+    Id = Guid.NewGuid(),
+    Username = "bob",
+    Email = "bob@example.com",
+    RegisteredAt = DateTimeOffset.UtcNow,
+    Address = null // Null address
+};
+
+var user3 = new User();
+map.From(userModel3).To(user3);
+Console.WriteLine($"User with null address: {user3.Username}");
+Console.WriteLine($"  Address is null: {user3.Address == null}");
 ```
 
 ## Generated Code
 
 The source generator will create these files during compilation:
 
-### User_Generated.g.cs
+### UserMappings_MapUser.g.cs
 ```csharp
 // <auto-generated/>
 #nullable enable
 
 namespace MapGeneratorDemo
 {
-    partial class User
+    partial class UserMappings
     {
-        /// <summary>
-        /// Maps properties from another instance of User.
-        /// </summary>
-        public void MapFrom(User source)
+        public partial void MapUser(IMap map, UserModel from, User to)
         {
-            if (source == null)
+            to.Id = from.Id;
+            to.Username = from.Username;
+            to.Email = from.Email;
+            to.IsActive = from.IsActive;
+            
+            // Custom converter automatically used
+            to.RegisteredAt = ConvertDateTimeOffset(from.RegisteredAt);
+            
+            // Smart null handling with factory support
+            if (from.Address != null)
             {
-                throw new System.ArgumentNullException(nameof(source));
+                if (to.Address == null)
+                {
+                    to.Address = map.From(from.Address).To<Address>();
+                }
+                else
+                {
+                    map.From(from.Address).To(to.Address);
+                }
             }
-
-            this.Id = source.Id;
-            this.Username = source.Username;
-            this.Email = source.Email;
-            this.CreatedAt = source.CreatedAt;
-            this.IsActive = source.IsActive;
+            else
+            {
+                to.Address = null;
+            }
+            
+            // Collection mapping
+            to.Features = map.From<FeatureModel>(from.Features).ToList<Feature>();
         }
     }
 }
 ```
 
-### UserMapper_MapToDto.g.cs
+### UserMappings_MapAddress.g.cs
 ```csharp
 // <auto-generated/>
 #nullable enable
 
 namespace MapGeneratorDemo
 {
-    partial class UserMapper
+    partial class UserMappings
     {
-        public partial UserDto MapToDto(User user)
+        public partial void MapAddress(IMap map, AddressModel from, Address to)
         {
-            var result = new UserDto();
-
-            result.Id = user.Id;
-            result.Username = user.Username;
-            result.Email = user.Email;
-            result.CreatedAt = user.CreatedAt;
-            result.IsActive = user.IsActive;
-
-            return result;
-        }
-    }
-}
-```
-
-### UserMapper_MapFromRequest.g.cs
-```csharp
-// <auto-generated/>
-#nullable enable
-
-namespace MapGeneratorDemo
-{
-    partial class UserMapper
-    {
-        public partial User MapFromRequest(CreateUserRequest request)
-        {
-            var result = new User();
-
-            result.Username = request.Username;
-            result.Email = request.Email;
-
-            return result;
+            to.Street = from.Street;
+            to.City = from.City;
+            to.ZipCode = from.ZipCode;
         }
     }
 }
@@ -205,36 +242,33 @@ namespace MapGeneratorDemo
 ## Expected Output
 
 ```
-=== Example 1: Mapping from CreateUserRequest ===
-Created User: johndoe (john@example.com)
-  ID: 12345678-1234-1234-1234-123456789abc
-  Created: 12/13/2025 6:00:00 PM
+=== Example 1: Complex Mapping with Nested Objects ===
+User: johndoe (john@example.com)
+  Registered: 12/13/2025 9:00:00 PM
   Active: True
+  Address: 123 Main St, Springfield
+  Features: Premium, Analytics
 
-=== Example 2: Mapping to UserDto ===
-DTO: johndoe (john@example.com)
-  ID: 12345678-1234-1234-1234-123456789abc
-  Created: 12/13/2025 6:00:00 PM
-  Active: True
+=== Example 2: Factory Usage ===
+Address created via factory: 456 Oak Ave
 
-=== Example 3: Cloning with MapFrom ===
-Cloned User: johndoe (john@example.com)
-  Original ID: 12345678-1234-1234-1234-123456789abc
-  Cloned ID: 87654321-4321-4321-4321-cba987654321
-
-=== Example 4: Performance Test ===
-Mapped 1,000,000 objects in 25ms
-Average: 0.000025ms per mapping
+=== Example 3: Null Handling ===
+User with null address: bob
+  Address is null: True
 ```
 
 ## Key Takeaways
 
-1. **Zero Configuration**: Just add `[Mapping]` attribute
-2. **Type Safety**: All code is generated and type-checked at compile time
-3. **Performance**: No reflection, no runtime overhead
-4. **Debuggable**: Step into generated code just like handwritten code
-5. **Transparent**: Generated files visible in obj/GeneratedFiles folder
-6. **Incremental**: Fast compilation with intelligent caching
+1. **Flexible Method Names**: Use any names that make sense for your domain
+2. **IMap Integration**: Automatic use of `IMap` for complex types and collections
+3. **Factory Support**: Respects factories registered with `IMap.RegisterFactory`
+4. **Custom Converters**: Automatic detection and use of type conversion methods
+5. **Smart Null Handling**: Proper null checking for both source and target
+6. **Type Safety**: All code is generated and type-checked at compile time
+7. **Performance**: No reflection, no runtime overhead
+8. **Debuggable**: Step into generated code just like handwritten code
+9. **Transparent**: Generated files visible in obj/GeneratedFiles folder
+10. **Incremental**: Fast compilation with intelligent caching
 
 ## Viewing Generated Files
 

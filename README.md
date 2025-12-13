@@ -27,33 +27,49 @@ dotnet add package Najlot.Map.SourceGenerator
 The source generator provides compile-time code generation for mapping with zero runtime overhead:
 
 ```csharp
+using Najlot.Map;
 using Najlot.Map.SourceGenerator;
 
-// Apply [Mapping] to partial classes for self-mapping
+// Class-level [Mapping] generates implementations for all partial methods
 [Mapping]
-public partial class User
+public partial class UserMappings
 {
-    public int Id { get; set; }
-    public string Name { get; set; }
-    public string Email { get; set; }
+    // You can use any method name - not restricted to "MapFrom"
+    public partial void MapUser(IMap map, UserModel from, User to);
+    public partial void MapFeature(IMap map, FeatureModel from, Feature to);
+    
+    // Custom converter - automatically detected and used
+    public DateTime ConvertToUtc(DateTimeOffset offset) => offset.UtcDateTime;
 }
 
-// Usage - MapFrom method is generated at compile time
-var source = new User { Id = 1, Name = "John", Email = "john@example.com" };
-var target = new User();
-target.MapFrom(source); // Generated method
+// Register and use with IMap
+var map = new Map()
+    .Register<UserMappings>()
+    .RegisterFactory(type => /* your factory logic */);
 
-// Apply [Mapping] to partial methods for cross-type mapping
+var userModel = new UserModel { /* ... */ };
+var user = new User();
+map.From(userModel).To(user); // Uses generated mapping
+
+// Method-level [Mapping] for simple mappings
 public partial class UserMapper
 {
     [Mapping]
-    public partial UserDto MapToDto(User user);
+    public partial UserDto ConvertToDto(User user);
 }
 
-// Usage - method implementation is generated at compile time
 var mapper = new UserMapper();
-var dto = mapper.MapToDto(user); // Generated implementation
+var dto = mapper.ConvertToDto(user); // Uses generated implementation
 ```
+
+### Key Features
+
+- **Flexible naming**: Use any method names that make sense for your domain
+- **IMap integration**: Automatically uses `IMap` for complex types and collections
+- **Factory support**: Respects factories registered with `IMap.RegisterFactory`
+- **Custom converters**: Detects and uses custom type conversion methods
+- **Smart null handling**: Proper null checking with factory-aware object creation
+- **Property ignoring**: Use `[MapIgnoreProperty]` to skip specific properties
 
 For more information about the source generator, see [Najlot.Map.SourceGenerator README](src/Najlot.Map.SourceGenerator/README.md).
 

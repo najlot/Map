@@ -6,8 +6,14 @@ A high-performance incremental source generator for Najlot.Map that provides aut
 
 - **Incremental Generation**: Uses Roslyn's incremental generator API for optimal performance
 - **Smart Caching**: Only regenerates code when necessary, providing fast compilation times
-- **Partial Class Support**: Generate mapping methods for partial classes
-- **Partial Method Support**: Implement partial methods with automatic property mapping
+- **Class-Level Mapping**: Apply `[Mapping]` to a class to generate implementations for all partial methods
+- **Method-Level Mapping**: Apply `[Mapping]` to individual partial methods
+- **Flexible Method Names**: Use any method name - not restricted to "MapFrom"
+- **IMap Integration**: Automatically uses `IMap` for complex types and collections
+- **Factory Support**: Respects factories registered with `IMap.RegisterFactory`
+- **Custom Type Converters**: Detects and uses custom mapping methods for type conversions
+- **Property Ignoring**: Use `[MapIgnoreProperty]` to skip specific properties
+- **Smart Null Handling**: Proper null checking for both source and target properties
 - **Zero Runtime Overhead**: All code generation happens at compile time
 
 ## Installation
@@ -18,83 +24,69 @@ dotnet add package Najlot.Map.SourceGenerator
 
 ## Usage
 
-### Partial Class Mapping
+### Class-Level Mapping with IMap
 
-Apply the `[Mapping]` attribute to a partial class to generate a `MapFrom` method:
+Apply the `[Mapping]` attribute to a partial class to generate implementations for all partial methods:
 
 ```csharp
+using Najlot.Map;
 using Najlot.Map.SourceGenerator;
 
 [Mapping]
-public partial class User
+public partial class UserMappings
 {
-    public int Id { get; set; }
-    public string Name { get; set; }
-    public string Email { get; set; }
+    // Partial methods with IMap parameter
+    public partial void MapUser(IMap map, UserModel from, User to);
+    public partial void MapAddress(IMap map, AddressModel from, Address to);
+    
+    // Custom type converter - automatically detected and used
+    public DateTime ConvertDate(DateTimeOffset offset) => offset.UtcDateTime;
 }
 
-// Usage
-var source = new User { Id = 1, Name = "John", Email = "john@example.com" };
-var target = new User();
-target.MapFrom(source);
+// Register and use
+var map = new Map()
+    .Register<UserMappings>()
+    .RegisterFactory(t => /* your factory logic */);
+
+var userModel = new UserModel { /* ... */ };
+var user = new User();
+map.From(userModel).To(user);
 ```
 
-The source generator will create:
+The source generator will create implementations that:
+- Map simple properties directly (int, string, etc.)
+- Use `IMap.From().To()` for complex objects
+- Use `IMap.From().ToList()` for `List<T>` properties
+- Use `IMap.From().ToArray()` for arrays
+- Call custom converter methods when property types don't match
+- Handle null sources and targets properly with factory support
+
+### Ignoring Properties
+
+Use `[MapIgnoreProperty]` to skip specific properties:
 
 ```csharp
-public partial class User
+[Mapping]
+public partial class UserMappings
 {
-    /// <summary>
-    /// Maps properties from another instance of User.
-    /// </summary>
-    public void MapFrom(User source)
-    {
-        if (source == null)
-        {
-            throw new System.ArgumentNullException(nameof(source));
-        }
-
-        this.Id = source.Id;
-        this.Name = source.Name;
-        this.Email = source.Email;
-    }
+    [MapIgnoreProperty(nameof(to.Password))]
+    [MapIgnoreProperty(nameof(to.Salt))]
+    public partial void MapUser(IMap map, UserModel from, User to);
 }
 ```
 
-### Partial Method Mapping
+### Method-Level Mapping
 
-Apply the `[Mapping]` attribute to a partial method to generate the implementation:
+Apply `[Mapping]` to individual partial methods for simple mappings:
 
 ```csharp
-using Najlot.Map.SourceGenerator;
-
 public partial class UserMapper
 {
     [Mapping]
     public partial UserDto MapToDto(User user);
-}
-
-// Usage
-var mapper = new UserMapper();
-var user = new User { Id = 1, Name = "John", Email = "john@example.com" };
-var dto = mapper.MapToDto(user);
-```
-
-The source generator will create:
-
-```csharp
-public partial class UserMapper
-{
-    public partial UserDto MapToDto(User user)
-    {
-        var result = new UserDto();
-        
-        result.Id = user.Id;
-        result.Name = user.Name;
-        result.Email = user.Email;
-        
-        return result;
-    }
+    
+    [Mapping]
+    public partial void MapUserDetails(IMap map, UserModel from, User to);
 }
 ```
 
@@ -102,8 +94,55 @@ public partial class UserMapper
 
 1. **Compilation Time**: The source generator runs during compilation
 2. **Syntax Analysis**: It finds all partial classes and methods decorated with `[Mapping]`
-3. **Code Generation**: For each target, it generates appropriate mapping code
-4. **Caching**: Uses incremental generation to avoid regenerating unchanged code
+3. **Code Generation**: For each target, it generates appropriate mapping code:
+   - **Class-level**: Generates implementations for all partial void methods with signature `(IMap map, TSource from, TTarget to)`
+   - **Method-level**: Generates implementations for individual partial methods
+4. **Smart Mapping**:
+   - Direct assignment for matching simple types
+   - Custom converter method detection for type mismatches
+   - `IMap` usage for complex objects and collections
+   - Factory-aware object creation
+5. **Caching**: Uses incremental generation to avoid regenerating unchanged code
+
+## Generated Code Examples
+
+### For Complex Types with Nested Objects
+
+```csharp
+// Input
+[Mapping]
+public partial class UserMappings
+{
+    public partial void MapUser(IMap map, UserModel from, User to);
+}
+
+// Generated
+public partial void MapUser(IMap map, UserModel from, User to)
+{
+    to.Id = from.Id;
+    to.Name = from.Name;
+    
+    // Nested object with null handling and factory support
+    if (from.Address != null)
+    {
+        if (to.Address == null)
+        {
+            to.Address = map.From(from.Address).To<Address>();
+        }
+        else
+        {
+            map.From(from.Address).To(to.Address);
+        }
+    }
+    else
+    {
+        to.Address = null;
+    }
+    
+    // Collection mapping
+    to.Features = map.From<FeatureModel>(from.Features).ToList<Feature>();
+}
+```
 
 ## Performance Characteristics
 
@@ -116,22 +155,100 @@ public partial class UserMapper
 - .NET Standard 2.0 or higher
 - C# 9.0 or higher (for partial method support with return types)
 
+## Supported Scenarios
+
+### Method Signatures
+
+The generator supports two types of partial methods:
+
+1. **Void methods with 3 parameters** (for complex mappings with IMap):
+   ```csharp
+   public partial void AnyMethodName(IMap map, TSource from, TTarget to);
+   ```
+
+2. **Methods with return type and 1 parameter** (for simple mappings):
+   ```csharp
+   public partial TTarget AnyMethodName(TSource source);
+   ```
+
+### Mapping Behavior
+
+- **Simple Types**: Direct property assignment (int, string, bool, DateTime, etc.)
+- **Complex Objects**: Uses `IMap.From().To<T>()` or `IMap.From().To(existing)`
+- **Collections**: 
+  - `List<T>` → uses `ToList<T>()`
+  - Arrays → uses `ToArray<T>()`
+  - `IEnumerable<T>` → uses `To<T>()`
+- **Custom Conversions**: Automatically detects and uses methods with signature `TTarget MethodName(TSource source)`
+- **Null Handling**: 
+  - Checks source for null before mapping
+  - Uses factory when target is null
+  - Maps to existing object when target is not null
+  - Sets target to null when source is null
+
 ## Limitations
 
 - Only properties with both getter and setter are mapped
 - Property mapping is based on name matching only
-- Only supports partial classes and partial methods
-- Partial methods must have a single parameter and return a non-void type
+- Partial methods must be in partial classes
+- Custom converter methods must be in the same class
 
 ## Advanced Scenarios
 
-### Customizing Generated Code
+### Using Custom Type Converters
 
-Currently, the generator creates simple property-to-property mappings. For more complex scenarios, you can:
+The generator automatically detects and uses custom converter methods:
 
-1. Use the main Najlot.Map library for custom mapping logic
-2. Manually implement partial methods for complex transformations
-3. Combine generated code with custom mapping extensions
+```csharp
+[Mapping]
+public partial class UserMappings
+{
+    public partial void MapUser(IMap map, UserModel from, User to);
+    
+    // This will be automatically used when mapping DateTimeOffset to DateTime
+    public DateTime ConvertToUtc(DateTimeOffset offset) => offset.UtcDateTime;
+    
+    // This will be used for Guid to string conversions
+    public string GuidToString(Guid id) => id.ToString("N");
+}
+```
+
+### Working with Factories
+
+The generator respects factories registered with `IMap.RegisterFactory`:
+
+```csharp
+var map = new Map()
+    .Register<UserMappings>()
+    .RegisterFactory(type =>
+    {
+        if (type == typeof(Address)) return new Address();
+        if (type == typeof(Feature)) return new Feature();
+        throw new InvalidOperationException($"No factory for {type}");
+    });
+
+// When mapping, the factory will be used to create new instances
+```
+
+### Combining with Manual Mapping
+
+For complex scenarios, combine generated code with manual logic:
+
+```csharp
+[Mapping]
+public partial class UserMappings
+{
+    [MapIgnoreProperty(nameof(to.FullName))]
+    public partial void MapUser(IMap map, UserModel from, User to);
+}
+
+// Then manually handle the ignored property
+public void MapUserComplete(IMap map, UserModel from, User to)
+{
+    MapUser(map, from, to);
+    to.FullName = $"{from.FirstName} {from.LastName}";
+}
+```
 
 ## Troubleshooting
 

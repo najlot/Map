@@ -1,3 +1,4 @@
+using Najlot.Map.Attributes;
 using Najlot.Map.SourceGenerator;
 
 namespace Najlot.Map.SourceGenerator.Tests;
@@ -7,74 +8,101 @@ namespace Najlot.Map.SourceGenerator.Tests;
 /// </summary>
 public class PartialMethodMappingTests
 {
-    [Fact]
-    public void Test_Partial_Method_With_Mapping_Attribute_Maps_Properties()
-    {
-        // Arrange
-        var mapper = new TestMapper();
-        var source = new SourceModel
-        {
-            Id = 123,
-            Name = "Test Name",
-            Description = "Test Description"
-        };
+	[Fact]
+	public void Test_Partial_Methods_With_Mapping_Attribute_Generates_Map_Method()
+	{
+		// Arrange
+		var registered = new DateTimeOffset(2025, 10, 12, 14, 30, 0, TimeSpan.Zero);
 
-        // Act
-        var result = mapper.MapToTarget(source);
+		var source = new TestUserModel
+		{
+			Id = 1,
+			Name = "Test User",
+			Email = "test@example.com",
+			DateRegistered = registered,
+			Address = new TestUserAddressModel
+			{
+				Street = "Main St",
+				HouseNumber = 123,
+				City = "Testville",
+				ZipCode = "12345"
+			},
+			Features =
+			[
+				new TestUserFeatureModel
+				{
+					FeatureCode = "F001",
+					FeatureName = "Feature 1"
+				},
+				new TestUserFeatureModel
+				{
+					FeatureCode = "F002",
+					FeatureName = "Feature 2"
+				}
+			]
+		};
 
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(123, result.Id);
-        Assert.Equal("Test Name", result.Name);
-        Assert.Equal("Test Description", result.Description);
-    }
+		var sessionId = Guid.NewGuid();
+		var target = new TestUser() { CurrentSessionId = sessionId };
 
-    [Fact]
-    public void Test_Partial_Method_Creates_New_Instance()
-    {
-        // Arrange
-        var mapper = new TestMapper();
-        var source = new SourceModel
-        {
-            Id = 456,
-            Name = "Another Name",
-            Description = "Another Description"
-        };
+		var map = new Map()
+			.Register<UserMappingMethods>()
+			.RegisterFactory(t =>
+			{
+				if (t == typeof(TestUser)) return new TestUser();
+				if (t == typeof(TestUserFeature)) return new TestUserFeature();
+				if (t == typeof(TestUserAddress)) return new TestUserAddress();
 
-        // Act
-        var result1 = mapper.MapToTarget(source);
-        var result2 = mapper.MapToTarget(source);
+				throw new InvalidOperationException($"No factory registered for type {t.FullName}");
+			});
 
-        // Assert
-        Assert.NotSame(result1, result2);
-    }
+		// Act
+		map.From(source).To(target);
+
+		// Assert
+		Assert.Equal(1, target.Id);
+		Assert.Equal("Test User", target.Name);
+		Assert.Equal("test@example.com", target.Email);
+		Assert.Equal(2, target.Features.Count);
+		Assert.Equal("F001", target.Features[0].FeatureCode);
+		Assert.Equal("Feature 1", target.Features[0].FeatureName);
+		Assert.Equal("F002", target.Features[1].FeatureCode);
+		Assert.Equal("Feature 2", target.Features[1].FeatureName);
+		Assert.NotNull(target.Address);
+		Assert.Equal("Main St", target.Address!.Street);
+		Assert.Equal(123, target.Address.HouseNumber);
+		Assert.Equal("Testville", target.Address.City);
+		Assert.Equal("12345", target.Address.ZipCode);
+		Assert.Equal(sessionId, target.CurrentSessionId);
+		Assert.Equal(registered.UtcDateTime, target.DateRegistered);
+	}
+
+	[Fact]
+	public void MapShouldBeValid()
+	{
+		// Arrange
+		var map = new Map().Register<UserMappingMethods>();
+
+		// Act: Validate should not throw exception
+		map.Validate();
+	}
 }
 
 /// <summary>
 /// Test mapper class with partial method for source generator.
 /// </summary>
-public partial class TestMapper
+public partial class UserMappingMethods
 {
-    [Mapping]
-    public partial TargetModel MapToTarget(SourceModel source);
-}
+	[Mapping]
+	[MapIgnoreProperty(nameof(to.CurrentSessionId))]
+	public partial void MapFrom(IMap map, TestUserModel from, TestUser to);
 
-/// <summary>
-/// Source model for testing.
-/// </summary>
-public class SourceModel
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-}
+	[Mapping]
+	public partial void MapFrom(IMap map, TestUserFeatureModel from, TestUserFeature to);
 
-/// <summary>
-/// Target model for testing.
-/// </summary>
-public class TargetModel
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+	[Mapping]
+	public partial void MapFrom(IMap map, TestUserAddressModel from, TestUserAddress to);
+
+	// Additional mapping method for DateTimeOffset to DateTime
+	public DateTime MapFrom(DateTimeOffset from) => from.UtcDateTime;
 }

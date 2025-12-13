@@ -1,3 +1,4 @@
+using Najlot.Map.Attributes;
 using Najlot.Map.SourceGenerator;
 
 namespace Najlot.Map.SourceGenerator.Tests;
@@ -8,14 +9,24 @@ namespace Najlot.Map.SourceGenerator.Tests;
 public class PartialClassMappingTests
 {
     [Fact]
-    public void Test_Partial_Class_With_Mapping_Attribute_Generates_MapFrom_Method()
+    public void Test_Partial_Class_With_Mapping_Attribute_Generates_Map_Methods()
     {
-        // Arrange
-        var source = new TestUserModel
+		// Arrange
+		var registered = new DateTimeOffset(2025, 10, 12, 14, 30, 0, TimeSpan.Zero);
+
+		var source = new TestUserModel
 		{
             Id = 1,
             Name = "Test User",
             Email = "test@example.com",
+			DateRegistered = registered,
+			Address = new TestUserAddressModel
+			{
+				Street = "Main St",
+				HouseNumber = 123,
+				City = "Testville",
+				ZipCode = "12345"
+			},
 			Features =
 			[
 				new TestUserFeatureModel
@@ -31,7 +42,8 @@ public class PartialClassMappingTests
 			]
 		};
 
-        var target = new TestUser();
+		var sessionId = Guid.NewGuid();
+		var target = new TestUser() { CurrentSessionId = sessionId };
 
 		var map = new Map()
 			.Register<UserMappings>()
@@ -39,6 +51,7 @@ public class PartialClassMappingTests
 			{
 				if (t == typeof(TestUser)) return new TestUser();
 				if (t == typeof(TestUserFeature)) return new TestUserFeature();
+				if (t == typeof(TestUserAddress)) return new TestUserAddress();
 
 				throw new InvalidOperationException($"No factory registered for type {t.FullName}");
 			});
@@ -55,7 +68,15 @@ public class PartialClassMappingTests
         Assert.Equal("Feature 1", target.Features[0].FeatureName);
         Assert.Equal("F002", target.Features[1].FeatureCode);
         Assert.Equal("Feature 2", target.Features[1].FeatureName);
-    }
+		Assert.NotNull(target.Address);
+		Assert.Equal("Main St", target.Address!.Street);
+		Assert.Equal(123, target.Address.HouseNumber);
+		Assert.Equal("Testville", target.Address.City);
+		Assert.Equal("12345", target.Address.ZipCode);
+		Assert.Equal("12345", target.Address.ZipCode);
+		Assert.Equal(sessionId, target.CurrentSessionId);
+		Assert.Equal(registered.UtcDateTime, target.DateRegistered);
+	}
 
 	[Fact]
 	public void MapShouldBeValid()
@@ -74,36 +95,11 @@ public class PartialClassMappingTests
 [Mapping]
 public partial class UserMappings
 {
+	[MapIgnoreProperty(nameof(to.CurrentSessionId))]
 	public partial void MapFrom(IMap map, TestUserModel from, TestUser to);
 	public partial void MapFrom(IMap map, TestUserFeatureModel from, TestUserFeature to);
-}
+	public partial void MapFrom(IMap map, TestUserAddressModel from, TestUserAddress to);
 
-public class TestUser
-{
-	public int Id { get; set; }
-	public string Name { get; set; } = string.Empty;
-	public string Email { get; set; } = string.Empty;
-
-	public List<TestUserFeature> Features { get; set; } = [];
-}
-
-public class TestUserFeature
-{
-	public string FeatureCode { get; set; } = string.Empty;
-	public string FeatureName { get; set; } = string.Empty;
-}
-
-public class TestUserModel
-{
-	public int Id { get; set; }
-	public string Name { get; set; } = string.Empty;
-	public string Email { get; set; } = string.Empty;
-
-	public List<TestUserFeatureModel> Features { get; set; } = [];
-}
-
-public class TestUserFeatureModel
-{
-	public string FeatureCode { get; set; } = string.Empty;
-	public string FeatureName { get; set; } = string.Empty;
+	// Additional mapping method for DateTimeOffset to DateTime
+	public DateTime MapFrom(DateTimeOffset from) => from.UtcDateTime;
 }

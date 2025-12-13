@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Najlot.Map.SourceGenerator\Najlot.Map.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Najlot.Map\Najlot.Map.csproj" />
   </ItemGroup>
 
   <ItemGroup>

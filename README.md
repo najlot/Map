@@ -1,10 +1,17 @@
 # ![M](images/icon.png) MAP
 Map is a simple library to manage map methods.
 
-## NuGet Package
-This library is distributed as a NuGet package.
-```
+## NuGet Packages
+This library is distributed as NuGet packages.
+
+### Core Library
+```bash
 dotnet add package Najlot.Map
+```
+
+### Source Generator (NEW!)
+```bash
+dotnet add package Najlot.Map.SourceGenerator
 ```
 
 ## Features
@@ -13,8 +20,44 @@ dotnet add package Najlot.Map
 - Supports complex mappings.
 - Flexible and easy to use.
 - Mapping validation and map assistance with the Map.Validate method.
+- **NEW**: Compile-time code generation with incremental source generator.
 
-## Quickstart
+## Source Generator Quickstart
+
+The source generator provides compile-time code generation for mapping with zero runtime overhead:
+
+```csharp
+using Najlot.Map.SourceGenerator;
+
+// Apply [Mapping] to partial classes for self-mapping
+[Mapping]
+public partial class User
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public string Email { get; set; }
+}
+
+// Usage - MapFrom method is generated at compile time
+var source = new User { Id = 1, Name = "John", Email = "john@example.com" };
+var target = new User();
+target.MapFrom(source); // Generated method
+
+// Apply [Mapping] to partial methods for cross-type mapping
+public partial class UserMapper
+{
+    [Mapping]
+    public partial UserDto MapToDto(User user);
+}
+
+// Usage - method implementation is generated at compile time
+var mapper = new UserMapper();
+var dto = mapper.MapToDto(user); // Generated implementation
+```
+
+For more information about the source generator, see [Najlot.Map.SourceGenerator README](src/Najlot.Map.SourceGenerator/README.md).
+
+## Runtime Mapping Quickstart
 Following classes will give you an idea of how this library can be used.
 For more information, see the unit tests or open an issue.
 

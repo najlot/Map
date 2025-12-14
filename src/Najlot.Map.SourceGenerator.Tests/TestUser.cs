@@ -55,3 +55,23 @@ public class TestUserAddressModel
 	public string City { get; set; } = string.Empty;
 	public string ZipCode { get; set; } = string.Empty;
 }
+
+public class TestUserViewModel // : ViewModelBase or something similar
+{
+	public int Id { get; set; }
+	public string Name { get; set; } = string.Empty;
+	public string Email { get; set; } = string.Empty;
+
+	public bool NotifyEnabled { get; set; }
+
+	private class NotifyDisposable(TestUserViewModel vm) : IDisposable
+	{
+		public void Dispose() => vm.NotifyEnabled = true;
+	}
+
+	public IDisposable StopNotify()
+	{
+		NotifyEnabled = false;
+		return new NotifyDisposable(this);
+	}
+}

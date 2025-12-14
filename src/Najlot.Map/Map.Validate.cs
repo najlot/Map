@@ -89,8 +89,8 @@ public partial class Map
 		var sourceType = sourceParameter.ParameterType;
 		var targetType = targetParameter.ParameterType;
 
-		var assignedProperties = GetCalledTargetProperties(method, targetType).ToArray();
-		var ignoredProperties = GetIgnoredProperties(method).ToArray();
+		var assignedProperties = GetCalledTargetProperties(method, sourceType, targetType, new HashSet<MethodInfo>()).ToArray();
+		var ignoredProperties = GetIgnoredProperties(method, sourceType, targetType, new HashSet<MethodInfo>()).ToArray();
 
 		var unmappedProperties = targetType
 			.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty)
@@ -142,18 +142,45 @@ public partial class Map
 		}
 	}
 
-	private IEnumerable<string> GetIgnoredProperties(MethodInfo method)
+	private IEnumerable<string> GetIgnoredProperties(MethodInfo method, Type sourceType, Type targetType, HashSet<MethodInfo> visitedMethods)
 	{
-		return method.CustomAttributes
+		// Avoid infinite recursion
+		if (!visitedMethods.Add(method))
+		{
+			yield break;
+		}
+
+		// Get directly ignored properties from this method
+		var directIgnored = method.CustomAttributes
 			.Where(a => a.AttributeType == typeof(MapIgnorePropertyAttribute))
 			.Select(a => a.ConstructorArguments[0].Value?.ToString())
 			.Where(p => p is not null)
-			.Cast<string>()
-			.ToArray();
+			.Cast<string>();
+
+		foreach (var prop in directIgnored)
+		{
+			yield return prop;
+		}
+
+		// Get ignored properties from called mapping methods
+		foreach (var calledMethod in GetCalledMappingMethods(method, sourceType, targetType))
+		{
+			foreach (var prop in GetIgnoredProperties(calledMethod, sourceType, targetType, visitedMethods))
+			{
+				yield return prop;
+			}
+		}
 	}
 
-	private IEnumerable<string> GetCalledTargetProperties(MethodInfo method, Type targetType)
+	private IEnumerable<string> GetCalledTargetProperties(MethodInfo method, Type sourceType, Type targetType, HashSet<MethodInfo> visitedMethods)
 	{
+		// Avoid infinite recursion
+		if (!visitedMethods.Add(method))
+		{
+			yield break;
+		}
+
+		// Get directly assigned properties from this method
 		foreach (var calledMethod in GetAssignedProperties(method))
 		{
 			if (calledMethod.DeclaringType == targetType)
@@ -161,6 +188,92 @@ public partial class Map
 				yield return calledMethod.Name.Substring(4);
 			}
 		}
+
+		// Get assigned properties from called mapping methods
+		foreach (var calledMethod in GetCalledMappingMethods(method, sourceType, targetType))
+		{
+			foreach (var prop in GetCalledTargetProperties(calledMethod, sourceType, targetType, visitedMethods))
+			{
+				yield return prop;
+			}
+		}
+	}
+
+	private IEnumerable<MethodInfo> GetCalledMappingMethods(MethodInfo method, Type sourceType, Type targetType)
+	{
+		var body = method.GetMethodBody();
+		Module module = method.Module;
+
+		byte[]? il = body?.GetILAsByteArray();
+
+		if (il is null)
+		{
+			yield break;
+		}
+
+		var operandType = OperandType.InlineNone;
+
+		for (int position = 0; position < il.Length; position += GetOperandSize(operandType))
+		{
+			var opCode = ReadOpCode(il, ref position);
+			operandType = opCode.OperandType;
+
+			if (operandType == OperandType.InlineMethod)
+			{
+				int metadataToken = BitConverter.ToInt32(il, position);
+				var calledMethod = module.ResolveMethod(metadataToken) as MethodInfo;
+				
+				if (calledMethod is not null && IsMappingMethod(calledMethod, sourceType, targetType))
+				{
+					yield return calledMethod;
+				}
+			}
+		}
+	}
+
+	private bool IsMappingMethod(MethodInfo method, Type sourceType, Type targetType)
+	{
+		// Check if this method is registered as a mapping delegate
+		foreach (var @delegate in _mapDelegates)
+		{
+			if (@delegate.Method == method)
+			{
+				return true;
+			}
+		}
+
+		// Check if the method signature matches a mapping method pattern
+		// For void methods: (source, target) or (IMap, source, target)
+		// For non-void methods: (source) => target or (IMap, source) => target
+		var parameters = method.GetParameters();
+		
+		if (method.ReturnType == typeof(void))
+		{
+			if (parameters.Length == 2)
+			{
+				return parameters[0].ParameterType == sourceType && parameters[1].ParameterType == targetType;
+			}
+			else if (parameters.Length == 3)
+			{
+				return parameters[0].ParameterType == typeof(IMap) &&
+				       parameters[1].ParameterType == sourceType && 
+				       parameters[2].ParameterType == targetType;
+			}
+		}
+		else if (method.ReturnType == targetType)
+		{
+			if (parameters.Length == 1)
+			{
+				return parameters[0].ParameterType == sourceType;
+			}
+			else if (parameters.Length == 2)
+			{
+				return parameters[0].ParameterType == typeof(IMap) &&
+				       parameters[1].ParameterType == sourceType;
+			}
+		}
+
+		return false;
 	}
 
 	private IEnumerable<MethodInfo> GetAssignedProperties(MethodInfo method)

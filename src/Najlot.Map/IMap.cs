@@ -112,6 +112,15 @@ public interface IMap
 	SimpleMapFactoryMethod<TFrom, TTo> GetFactoryMethod<TFrom, TTo>();
 
 	/// <summary>
+	/// Creates a new instance of the specified type.
+	/// Uses the registered factory method.
+	/// Used by map methods to create destination objects.
+	/// </summary>
+	/// <typeparam name="T">The type of object to create.</typeparam>
+	/// <returns>A new instance of type <typeparamref name="T"/>.</returns>
+	T Create<T>();
+
+	/// <summary>
 	/// Validates map methods and throws an exception if any of them miss some properties.
 	/// </summary>
 	void Validate();

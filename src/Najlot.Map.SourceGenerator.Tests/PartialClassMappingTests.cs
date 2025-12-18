@@ -82,7 +82,9 @@ public class PartialClassMappingTests
 	public void MapShouldBeValid()
 	{
 		// Arrange
-		var map = new Map().Register<UserMappings>();
+		var map = new Map()
+			.Register<UserMappings>()
+			.Register<BookingMappings>();
 
 		// Act: Validate should not throw exception
 		map.Validate();
@@ -97,9 +99,16 @@ public partial class UserMappings
 {
 	[MapIgnoreProperty(nameof(to.CurrentSessionId))]
 	public partial void MapUser(IMap map, TestUserModel from, TestUser to);
-	public partial void MapFeature(IMap map, TestUserFeatureModel from, TestUserFeature to);
-	public partial void MapAddress(IMap map, TestUserAddressModel from, TestUserAddress to);
+	public partial void MapFeature(TestUserFeatureModel from, TestUserFeature to);
+	public static partial void MapAddress(IMap map, TestUserAddressModel from, TestUserAddress to);
 
 	// Additional mapping method for DateTimeOffset to DateTime
 	public DateTime MapOffsetToUtcDateTime(DateTimeOffset from) => from.UtcDateTime;
+}
+
+[Mapping]
+public partial class BookingMappings
+{
+	public partial CreateTestBookingRecord MapToCreate(TestBookingRecord from);
+	public partial TestBookingPositionUpdate MapToUpdate(IMap map, TestBookingPosition from);
 }

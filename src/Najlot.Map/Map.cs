@@ -19,6 +19,15 @@ public partial class Map : IMap
 		?? throw new NullReferenceException($"Activator.CreateInstance of type {type.FullName} returns null.");
 
 	/// <summary>
+	/// Creates a new instance of the specified type.
+	/// Uses the registered factory method.
+	/// Used by map methods to create destination objects.
+	/// </summary>
+	/// <typeparam name="T">The type of object to create.</typeparam>
+	/// <returns>A new instance of type <typeparamref name="T"/>.</returns>
+	public T Create<T>() => (T)_factory(typeof(T));
+
+	/// <summary>
 	/// Maps from a class.
 	/// </summary>
 	/// <typeparam name="T">Type of the class</typeparam>

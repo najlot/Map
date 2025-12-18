@@ -151,12 +151,19 @@ public class MappingGenerator : IIncrementalGenerator
         var className = classSymbol.Name;
         var fullClassName = classSymbol.ToDisplayString();
 
-        // Find all partial methods in the class with signature: partial void MethodName(IMap map, TSource from, TTarget to)
+        // Find all partial methods in the class with signature: 
+        // partial void MethodName(IMap map, TSource from, TTarget to)
+        // OR
+        // partial void MethodName(TSource from, TTarget to)
+        // OR
+        // partial TTarget MethodName(TSource from)
+        // OR
+        // partial TTarget MethodName(IMap map, TSource from)
         var partialMethods = classSymbol.GetMembers()
             .OfType<IMethodSymbol>()
             .Where(m => m.IsPartialDefinition 
-                     && m.ReturnsVoid
-                     && m.Parameters.Length == 3)
+                     && ((m.ReturnsVoid && (m.Parameters.Length == 3 || m.Parameters.Length == 2))
+                         || (!m.ReturnsVoid && (m.Parameters.Length == 1 || m.Parameters.Length == 2))))
             .ToList();
 
         if (partialMethods.Count == 0)
@@ -183,7 +190,14 @@ public class MappingGenerator : IIncrementalGenerator
         // Generate implementation for each partial method
         foreach (var method in partialMethods)
         {
-            GenerateMapFromImplementation(method, sb, indent);
+            if (method.ReturnsVoid)
+            {
+                GenerateMapFromImplementation(method, sb, indent);
+            }
+            else
+            {
+                GenerateMethodWithOneParamImplementation(method, sb, indent);
+            }
         }
 
         sb.AppendLine($"{indent}}}");
@@ -200,15 +214,27 @@ public class MappingGenerator : IIncrementalGenerator
     private static void GenerateMapFromImplementation(IMethodSymbol method, StringBuilder sb, string indent)
     {
         var parameters = method.Parameters;
-        if (parameters.Length != 3)
+        if (parameters.Length != 3 && parameters.Length != 2)
         {
             return;
         }
 
-        // First parameter should be IMap
-        var mapParam = parameters[0];
-        var sourceParam = parameters[1];
-        var targetParam = parameters[2];
+        IParameterSymbol? mapParam = null;
+        IParameterSymbol sourceParam;
+        IParameterSymbol targetParam;
+
+        if (parameters.Length == 3)
+        {
+            // First parameter should be IMap
+            mapParam = parameters[0];
+            sourceParam = parameters[1];
+            targetParam = parameters[2];
+        }
+        else
+        {
+            sourceParam = parameters[0];
+            targetParam = parameters[1];
+        }
 
         var sourceType = sourceParam.Type;
         var targetType = targetParam.Type;
@@ -242,12 +268,21 @@ public class MappingGenerator : IIncrementalGenerator
 
         // Generate method signature
         var accessibility = GetAccessibilityModifier(method.DeclaredAccessibility);
-        var mapTypeName = mapParam.Type.ToDisplayString();
+        var modifiers = method.IsStatic ? "static partial" : "partial";
         var sourceTypeName = sourceType.ToDisplayString();
         var targetTypeName = targetType.ToDisplayString();
         var methodName = method.Name;
 
-        sb.AppendLine($"{indent}    {accessibility} partial void {methodName}({mapTypeName} {mapParam.Name}, {sourceTypeName} {sourceParam.Name}, {targetTypeName} {targetParam.Name})");
+        if (mapParam != null)
+        {
+            var mapTypeName = mapParam.Type.ToDisplayString();
+            sb.AppendLine($"{indent}    {accessibility} {modifiers} void {methodName}({mapTypeName} {mapParam.Name}, {sourceTypeName} {sourceParam.Name}, {targetTypeName} {targetParam.Name})");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}    {accessibility} {modifiers} void {methodName}({sourceTypeName} {sourceParam.Name}, {targetTypeName} {targetParam.Name})");
+        }
+
         sb.AppendLine($"{indent}    {{");
 
         // Generate mapping logic for each matching property
@@ -265,9 +300,90 @@ public class MappingGenerator : IIncrementalGenerator
                 continue;
             }
 
-            GeneratePropertyMapping(sourceProp, targetProp, sourceParam.Name, targetParam.Name, mapParam.Name, containingType, sb, indent);
+            GeneratePropertyMapping(sourceProp, targetProp, sourceParam.Name, targetParam.Name, mapParam?.Name, containingType, method.IsStatic, sb, indent);
         }
 
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine();
+    }
+
+    private static void GenerateMethodWithOneParamImplementation(IMethodSymbol methodSymbol, StringBuilder sb, string indent)
+    {
+        var parameters = methodSymbol.Parameters;
+        IParameterSymbol? mapParam = null;
+        IParameterSymbol sourceParam;
+
+        if (parameters.Length == 2)
+        {
+            mapParam = parameters[0];
+            sourceParam = parameters[1];
+        }
+        else
+        {
+            sourceParam = parameters[0];
+        }
+
+        var sourceType = sourceParam.Type;
+        var targetType = methodSymbol.ReturnType;
+        var containingType = methodSymbol.ContainingType;
+
+        var sourceProperties = sourceType.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(p => p.GetMethod is not null)
+            .ToList();
+
+        var targetProperties = targetType.GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(p => p.SetMethod is not null)
+            .ToList();
+
+        // Find matching properties
+        var matchingProperties = new List<(IPropertySymbol Source, IPropertySymbol Target)>();
+        foreach (var sourceProp in sourceProperties)
+        {
+            var targetProp = targetProperties.FirstOrDefault(tp => tp.Name == sourceProp.Name);
+            if (targetProp is not null)
+            {
+                matchingProperties.Add((sourceProp, targetProp));
+            }
+        }
+
+        // Generate method implementation
+        var returnTypeName = targetType.ToDisplayString();
+        var paramTypeName = sourceType.ToDisplayString();
+        var paramName = sourceParam.Name;
+        var accessibility = GetAccessibilityModifier(methodSymbol.DeclaredAccessibility);
+        var modifiers = methodSymbol.IsStatic ? "static partial" : "partial";
+        var methodName = methodSymbol.Name;
+
+        if (mapParam != null)
+        {
+            var mapTypeName = mapParam.Type.ToDisplayString();
+            sb.AppendLine($"{indent}    {accessibility} {modifiers} {returnTypeName} {methodName}({mapTypeName} {mapParam.Name}, {paramTypeName} {paramName})");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}    {accessibility} {modifiers} {returnTypeName} {methodName}({paramTypeName} {paramName})");
+        }
+
+        sb.AppendLine($"{indent}    {{");
+        if (mapParam != null)
+        {
+            sb.AppendLine($"{indent}        var result = {mapParam.Name}.Create<{returnTypeName}>();");
+        }
+        else
+        {
+            sb.AppendLine($"{indent}        var result = new {returnTypeName}();");
+        }
+        sb.AppendLine();
+
+        foreach (var (sourceProp, targetProp) in matchingProperties)
+        {
+            GeneratePropertyMapping(sourceProp, targetProp, paramName, "result", mapParam?.Name, containingType, methodSymbol.IsStatic, sb, indent);
+        }
+
+        sb.AppendLine();
+        sb.AppendLine($"{indent}        return result;");
         sb.AppendLine($"{indent}    }}");
         sb.AppendLine();
     }
@@ -277,8 +393,9 @@ public class MappingGenerator : IIncrementalGenerator
         IPropertySymbol targetProperty,
         string sourceParamName,
         string targetParamName,
-        string mapParamName,
+        string? mapParamName,
         INamedTypeSymbol containingType,
+        bool isStaticContext,
         StringBuilder sb,
         string indent)
     {
@@ -294,74 +411,77 @@ public class MappingGenerator : IIncrementalGenerator
         else
         {
             // Check for custom mapping method in the containing class
-            var customMapMethod = FindCustomMappingMethod(containingType, sourcePropertyType, targetPropertyType);
+            var customMapMethod = FindCustomMappingMethod(containingType, sourcePropertyType, targetPropertyType, isStaticContext);
             if (customMapMethod is not null)
             {
                 // Use custom mapping method
                 sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {customMapMethod.Name}({sourceParamName}.{sourceProperty.Name});");
             }
-            else if (IsCollectionType(sourcePropertyType) && IsCollectionType(targetPropertyType))
+            else if (mapParamName != null)
             {
-                // For collections, use IMap.From().ToList() or ToArray()
-                var sourceElementType = GetCollectionElementType(sourcePropertyType);
-                var targetElementType = GetCollectionElementType(targetPropertyType);
-                
-                if (sourceElementType is not null && targetElementType is not null)
+                if (IsCollectionType(sourcePropertyType) && IsCollectionType(targetPropertyType))
                 {
-                    var targetTypeName = targetPropertyType.ToDisplayString();
+                    // For collections, use IMap.From().ToList() or ToArray()
+                    var sourceElementType = GetCollectionElementType(sourcePropertyType);
+                    var targetElementType = GetCollectionElementType(targetPropertyType);
                     
-                    // Determine which method to call based on the target type
-                    if (targetTypeName.Contains("List<"))
+                    if (sourceElementType is not null && targetElementType is not null)
                     {
-                        sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToList<{targetElementType.ToDisplayString()}>();");
+                        var targetTypeName = targetPropertyType.ToDisplayString();
+                        
+                        // Determine which method to call based on the target type
+                        if (targetTypeName.Contains("List<"))
+                        {
+                            sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToList<{targetElementType.ToDisplayString()}>();");
+                        }
+                        else if (targetTypeName.Contains("[]"))
+                        {
+                            sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToArray<{targetElementType.ToDisplayString()}>();");
+                        }
+                        else
+                        {
+                            // Default to To<T>() for IEnumerable<T>
+                            sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).To<{targetElementType.ToDisplayString()}>();");
+                        }
                     }
-                    else if (targetTypeName.Contains("[]"))
-                    {
-                        sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToArray<{targetElementType.ToDisplayString()}>();");
-                    }
-                    else
-                    {
-                        // Default to To<T>() for IEnumerable<T>
-                        sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).To<{targetElementType.ToDisplayString()}>();");
-                    }
-                }
-            }
-            else
-            {
-                // For single objects, check if target is a value type or can be assigned
-                if (targetPropertyType.IsValueType)
-                {
-                    // For value types, we need to create and assign
-                    sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To<{targetPropertyType.ToDisplayString()}>();");
                 }
                 else
                 {
-                    // For reference types (objects), handle null properly and use factory if available
-                    var targetTypeDisplayString = targetPropertyType.ToDisplayString();
-                    // Remove nullable annotation for type parameter
-                    var targetTypeForFactory = targetTypeDisplayString.TrimEnd('?');
-                    
-                    sb.AppendLine($"{indent}        if ({sourceParamName}.{sourceProperty.Name} != null)");
-                    sb.AppendLine($"{indent}        {{");
-                    sb.AppendLine($"{indent}            if ({targetParamName}.{targetProperty.Name} == null)");
-                    sb.AppendLine($"{indent}            {{");
-                    sb.AppendLine($"{indent}                {targetParamName}.{targetProperty.Name} = {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To<{targetTypeForFactory}>();");
-                    sb.AppendLine($"{indent}            }}");
-                    sb.AppendLine($"{indent}            else");
-                    sb.AppendLine($"{indent}            {{");
-                    sb.AppendLine($"{indent}                {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To({targetParamName}.{targetProperty.Name});");
-                    sb.AppendLine($"{indent}            }}");
-                    sb.AppendLine($"{indent}        }}");
-                    sb.AppendLine($"{indent}        else");
-                    sb.AppendLine($"{indent}        {{");
-                    sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = null;");
-                    sb.AppendLine($"{indent}        }}");
+                    // For single objects, check if target is a value type or can be assigned
+                    if (targetPropertyType.IsValueType)
+                    {
+                        // For value types, we need to create and assign
+                        sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To<{targetPropertyType.ToDisplayString()}>();");
+                    }
+                    else
+                    {
+                        // For reference types (objects), handle null properly and use factory if available
+                        var targetTypeDisplayString = targetPropertyType.ToDisplayString();
+                        // Remove nullable annotation for type parameter
+                        var targetTypeForFactory = targetTypeDisplayString.TrimEnd('?');
+                        
+                        sb.AppendLine($"{indent}        if ({sourceParamName}.{sourceProperty.Name} != null)");
+                        sb.AppendLine($"{indent}        {{");
+                        sb.AppendLine($"{indent}            if ({targetParamName}.{targetProperty.Name} == null)");
+                        sb.AppendLine($"{indent}            {{");
+                        sb.AppendLine($"{indent}                {targetParamName}.{targetProperty.Name} = {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To<{targetTypeForFactory}>();");
+                        sb.AppendLine($"{indent}            }}");
+                        sb.AppendLine($"{indent}            else");
+                        sb.AppendLine($"{indent}            {{");
+                        sb.AppendLine($"{indent}                {mapParamName}.From({sourceParamName}.{sourceProperty.Name}).To({targetParamName}.{targetProperty.Name});");
+                        sb.AppendLine($"{indent}            }}");
+                        sb.AppendLine($"{indent}        }}");
+                        sb.AppendLine($"{indent}        else");
+                        sb.AppendLine($"{indent}        {{");
+                        sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = null;");
+                        sb.AppendLine($"{indent}        }}");
+                    }
                 }
             }
         }
     }
 
-    private static IMethodSymbol? FindCustomMappingMethod(INamedTypeSymbol containingType, ITypeSymbol sourceType, ITypeSymbol targetType)
+    private static IMethodSymbol? FindCustomMappingMethod(INamedTypeSymbol containingType, ITypeSymbol sourceType, ITypeSymbol targetType, bool isStaticContext)
     {
         // Look for a method with signature: TTarget MethodName(TSource source)
         var methods = containingType.GetMembers()
@@ -369,6 +489,11 @@ public class MappingGenerator : IIncrementalGenerator
             .Where(m => !m.IsPartialDefinition
                      && m.Parameters.Length == 1
                      && !m.ReturnsVoid);
+
+        if (isStaticContext)
+        {
+            methods = methods.Where(m => m.IsStatic);
+        }
 
         foreach (var method in methods)
         {
@@ -458,24 +583,26 @@ public class MappingGenerator : IIncrementalGenerator
 
         var parameters = methodSymbol.Parameters;
 
-        // Handle two cases:
+        // Handle cases:
         // 1. void MethodName(IMap map, TSource from, TTarget to) - 3 parameters
-        // 2. TTarget MethodName(TSource source) - 1 parameter with return type
+        // 2. void MethodName(TSource from, TTarget to) - 2 parameters
+        // 3. TTarget MethodName(TSource source) - 1 parameter with return type
+        // 4. TTarget MethodName(IMap map, TSource source) - 2 parameters with return type
         
-        if (parameters.Length == 3 && methodSymbol.ReturnsVoid)
+        if ((parameters.Length == 3 || parameters.Length == 2) && methodSymbol.ReturnsVoid)
         {
-            // This is a method-level [Mapping] attribute on a void method with 3 params
+            // This is a method-level [Mapping] attribute on a void method with 3 or 2 params
             // Generate it the same way as class-level mappings
-            GenerateMappingForMethodWithThreeParams(methodSymbol, context);
+            GenerateMappingForVoidMethod(methodSymbol, context);
         }
-        else if (parameters.Length == 1 && !methodSymbol.ReturnsVoid)
+        else if ((parameters.Length == 1 || parameters.Length == 2) && !methodSymbol.ReturnsVoid)
         {
             // This is a method-level [Mapping] attribute on a method with return type
             GenerateMappingForMethodWithOneParam(methodSymbol, context);
         }
     }
 
-    private static void GenerateMappingForMethodWithThreeParams(IMethodSymbol methodSymbol, SourceProductionContext context)
+    private static void GenerateMappingForVoidMethod(IMethodSymbol methodSymbol, SourceProductionContext context)
     {
         var containingClass = methodSymbol.ContainingType;
         var namespaceName = containingClass.ContainingNamespace.IsGlobalNamespace
@@ -510,7 +637,10 @@ public class MappingGenerator : IIncrementalGenerator
             sb.AppendLine("}");
         }
 
-        var fileName = $"{fullClassName.Replace("<", "_").Replace(">", "_").Replace(".", "_")}_{methodSymbol.Name}_{methodSymbol.Parameters[1].Type.Name}_{methodSymbol.Parameters[2].Type.Name}.g.cs";
+        var sourceParam = methodSymbol.Parameters.Length == 3 ? methodSymbol.Parameters[1] : methodSymbol.Parameters[0];
+        var targetParam = methodSymbol.Parameters.Length == 3 ? methodSymbol.Parameters[2] : methodSymbol.Parameters[1];
+
+        var fileName = $"{fullClassName.Replace("<", "_").Replace(">", "_").Replace(".", "_")}_{methodSymbol.Name}_{sourceParam.Type.Name}_{targetParam.Type.Name}.g.cs";
         context.AddSource(fileName, sb.ToString());
     }
 
@@ -523,36 +653,6 @@ public class MappingGenerator : IIncrementalGenerator
 
         var className = containingClass.Name;
         var methodName = methodSymbol.Name;
-
-        var parameters = methodSymbol.Parameters;
-        var sourceType = parameters[0].Type;
-        var targetType = methodSymbol.ReturnType;
-
-        var sourceProperties = sourceType.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.GetMethod is not null)
-            .ToList();
-
-        var targetProperties = targetType.GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(p => p.SetMethod is not null && p.GetMethod is not null)
-            .ToList();
-
-        // Find matching properties
-        var matchingProperties = new List<(IPropertySymbol Source, IPropertySymbol Target)>();
-        foreach (var sourceProp in sourceProperties)
-        {
-            var targetProp = targetProperties.FirstOrDefault(tp => tp.Name == sourceProp.Name);
-            if (targetProp is not null)
-            {
-                matchingProperties.Add((sourceProp, targetProp));
-            }
-        }
-
-        if (matchingProperties.Count == 0)
-        {
-            return; // No matching properties
-        }
 
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated/>");
@@ -570,25 +670,7 @@ public class MappingGenerator : IIncrementalGenerator
         sb.AppendLine($"{indent}partial class {className}");
         sb.AppendLine($"{indent}{{");
 
-        // Generate method implementation
-        var returnTypeName = targetType.ToDisplayString();
-        var paramTypeName = sourceType.ToDisplayString();
-        var paramName = parameters[0].Name;
-        var accessibility = GetAccessibilityModifier(methodSymbol.DeclaredAccessibility);
-
-        sb.AppendLine($"{indent}    {accessibility} partial {returnTypeName} {methodName}({paramTypeName} {paramName})");
-        sb.AppendLine($"{indent}    {{");
-        sb.AppendLine($"{indent}        var result = new {returnTypeName}();");
-        sb.AppendLine();
-
-        foreach (var (sourceProp, targetProp) in matchingProperties)
-        {
-            sb.AppendLine($"{indent}        result.{targetProp.Name} = {paramName}.{sourceProp.Name};");
-        }
-
-        sb.AppendLine();
-        sb.AppendLine($"{indent}        return result;");
-        sb.AppendLine($"{indent}    }}");
+        GenerateMethodWithOneParamImplementation(methodSymbol, sb, indent);
 
         sb.AppendLine($"{indent}}}");
 
@@ -601,21 +683,18 @@ public class MappingGenerator : IIncrementalGenerator
         context.AddSource(fileName, sb.ToString());
     }
 
-    private static string GetAccessibilityModifier(Accessibility accessibility)
-    {
-        return accessibility switch
-        {
-            Accessibility.Public => "public",
-            Accessibility.Private => "private",
-            Accessibility.Protected => "protected",
-            Accessibility.Internal => "internal",
-            Accessibility.ProtectedOrInternal => "protected internal",
-            Accessibility.ProtectedAndInternal => "private protected",
-            _ => "private"
-        };
-    }
+	private static string GetAccessibilityModifier(Accessibility accessibility) => accessibility switch
+	{
+		Accessibility.Public => "public",
+		Accessibility.Private => "private",
+		Accessibility.Protected => "protected",
+		Accessibility.Internal => "internal",
+		Accessibility.ProtectedOrInternal => "protected internal",
+		Accessibility.ProtectedAndInternal => "private protected",
+		_ => "private"
+	};
 
-    private const string AttributeSourceCode = @"// <auto-generated/>
+	private const string AttributeSourceCode = @"// <auto-generated/>
 namespace Najlot.Map.SourceGenerator
 {
     /// <summary>

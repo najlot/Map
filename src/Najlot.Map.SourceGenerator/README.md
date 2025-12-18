@@ -271,4 +271,4 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
-This project is licensed under the same license as Najlot.Map.
+This project is licensed under the MIT license.

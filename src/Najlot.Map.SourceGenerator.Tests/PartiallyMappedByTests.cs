@@ -17,11 +17,13 @@ public class PartiallyMappedByTests
 			Email = "test@example.com",
 		};
 
+		var userService = new TestUserService();
+
 		var map = new Map()
 			.Register<TestUserViewModelMappings>()
 			.RegisterFactory(t =>
 			{
-				if (t == typeof(TestUserViewModel)) return new TestUserViewModel();
+				if (t == typeof(TestUserViewModel)) return new TestUserViewModel(userService);
 				throw new InvalidOperationException($"No factory registered for type {t.FullName}");
 			});
 
@@ -51,7 +53,6 @@ public partial class TestUserViewModelMappings
 {
 	[MapIgnoreProperty(nameof(to.NotifyEnabled))]
 	private partial void GeneratedMapToViewModel(IMap map, TestUserModel from, TestUserViewModel to);
-
 	public void MapToViewModel(IMap map, TestUserModel from, TestUserViewModel to)
 	{
 		using (to.StopNotify()) // Prevent NotifyEnabled property change notifications during mapping
@@ -59,4 +60,7 @@ public partial class TestUserViewModelMappings
 			GeneratedMapToViewModel(map, from, to);
 		}
 	}
+
+	[MapIgnoreProperty(nameof(TestUserViewModel.NotifyEnabled))]
+	public partial TestUserViewModel TestUserModelToTestUserViewModel(IMap map, TestUser from);
 }

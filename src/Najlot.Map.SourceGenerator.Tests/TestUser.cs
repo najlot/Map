@@ -56,8 +56,13 @@ public class TestUserAddressModel
 	public string ZipCode { get; set; } = string.Empty;
 }
 
-public class TestUserViewModel // : ViewModelBase or something similar
+public interface ITestUserService { void Do(); }
+public class TestUserService : ITestUserService { public void Do() { } }
+
+public class TestUserViewModel(ITestUserService userService) // : ViewModelBase or something similar
 {
+	public ITestUserService UserService => userService;
+
 	public int Id { get; set; }
 	public string Name { get; set; } = string.Empty;
 	public string Email { get; set; } = string.Empty;

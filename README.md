@@ -1,5 +1,5 @@
 # ![M](images/icon.png) MAP
-Map is a simple library to manage map methods.
+Map is a simple library to manage mapping methods.
 
 ## NuGet Packages
 This library is distributed as NuGet packages.
@@ -9,7 +9,7 @@ This library is distributed as NuGet packages.
 dotnet add package Najlot.Map
 ```
 
-### Source Generator (NEW!)
+### Source Generator
 ```bash
 dotnet add package Najlot.Map.SourceGenerator
 ```
@@ -20,7 +20,7 @@ dotnet add package Najlot.Map.SourceGenerator
 - Supports complex mappings.
 - Flexible and easy to use.
 - Mapping validation and map assistance with the Map.Validate method.
-- **NEW**: Compile-time code generation with incremental source generator.
+- Compile-time code generation with incremental source generator.
 
 ## Source Generator Quickstart
 
@@ -38,6 +38,16 @@ public partial class UserMappings
     public partial void MapUser(IMap map, UserModel from, User to);
     public partial void MapFeature(IMap map, FeatureModel from, Feature to);
     
+	// Generator detects private partial methods too, but the IMap.Register call won't register them
+	private partial void PartialMapAddress(IMap map, AddressModel from, AddressViewModel to);
+	// That may you can do something like this:
+	public void MapAddress(IMap map, AddressModel from, AddressViewModel to)
+	{
+		// Before mapping logic (or custom mapping) here...
+		PartialMapAddress(map, from, to);
+		// After mapping logic (or custom mapping) here...
+	}
+
     // Custom converter - automatically detected and used
     public DateTime ConvertToUtc(DateTimeOffset offset) => offset.UtcDateTime;
 }

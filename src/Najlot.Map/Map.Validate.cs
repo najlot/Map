@@ -1,6 +1,5 @@
 ﻿using Najlot.Map.Attributes;
 using Najlot.Map.Exceptions;
-using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
@@ -358,14 +357,6 @@ public partial class Map
 		{
 			if (field.GetValue(null) is OpCode opCode)
 			{
-				var c1 = OpCodes.Call;
-				var c2 = OpCodes.Callvirt;
-
-				if (opCode == c1 || opCode == c2)
-				{
-					Debug.WriteLine(opCode.Name);
-				}
-
 				ushort value = (ushort)opCode.Value;
 				if (value < 0x100)
 				{

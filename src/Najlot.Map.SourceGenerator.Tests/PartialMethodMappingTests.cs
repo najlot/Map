@@ -78,10 +78,57 @@ public class PartialMethodMappingTests
 	}
 
 	[Fact]
+	public void Test_Booking_Mappings()
+	{
+		// Arrange
+		var source = new TestBookingRecord
+		{
+			Id = Guid.NewGuid(),
+			Currency = "EUR",
+			TotalAmount = 123.45,
+			Positions =
+			[
+				new TestBookingPosition
+				{
+					Id = 1,
+					Description = "Pos 1",
+					Price = 10.0,
+					Quantity = 1
+				}
+			]
+		};
+
+		var map = new Map().Register<BookingMappingMethods>();
+
+		// Act
+		var result = map.From(source).To<CreateTestBookingRecord>();
+
+		// Assert
+		Assert.Equal(source.Id, result.Id);
+		Assert.Equal(source.Currency, result.Currency);
+		Assert.Equal(source.TotalAmount, result.TotalAmount);
+		Assert.Single(result.Positions);
+		Assert.Equal(source.Positions[0].Id, result.Positions[0].Id);
+
+		// Test Update mapping
+		var posSource = source.Positions[0];
+		
+		// Since MapToUpdate returns a new object, we use To<T>()
+		var posTarget = map.From(posSource).To<TestBookingPositionUpdate>();
+
+		Assert.Equal(posSource.Id, posTarget.Id);
+		Assert.Equal(posSource.Description, posTarget.Description);
+		Assert.Equal(posSource.Price, posTarget.Price);
+		Assert.Equal(posSource.Quantity, posTarget.Quantity);
+	}
+
+	[Fact]
 	public void MapShouldBeValid()
 	{
 		// Arrange
-		var map = new Map().Register<UserMappingMethods>();
+		var map = new Map()
+			.Register<UserMappingMethods>()
+			.Register<BookingMappingMethods>();
 
 		// Act: Validate should not throw exception
 		map.Validate();
@@ -98,11 +145,20 @@ public partial class UserMappingMethods
 	public partial void UserModelToUser(IMap map, TestUserModel from, TestUser to);
 
 	[Mapping]
-	public partial void FeatureModelToFeature(IMap map, TestUserFeatureModel from, TestUserFeature to);
+	public partial void FeatureModelToFeature(TestUserFeatureModel from, TestUserFeature to);
 
 	[Mapping]
-	public partial void AddressModelToAddress(IMap map, TestUserAddressModel from, TestUserAddress to);
+	public static partial void AddressModelToAddress(IMap map, TestUserAddressModel from, TestUserAddress to);
 
 	// Additional mapping method for DateTimeOffset to DateTime
 	public DateTime MapOffsetToUtcDateTime(DateTimeOffset from) => from.UtcDateTime;
+}
+
+public partial class BookingMappingMethods
+{
+	[Mapping]
+	public partial CreateTestBookingRecord MapToCreate(TestBookingRecord from);
+
+	[Mapping]
+	public partial TestBookingPositionUpdate MapToUpdate(IMap map, TestBookingPosition from);
 }

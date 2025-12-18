@@ -7,9 +7,9 @@
 		<LangVersion>latest</LangVersion>
 		<IsPackable>true</IsPackable>
 		<Title>Map</Title>
-		<Version>0.0.7</Version>
+		<Version>0.0.8</Version>
 		<Authors>Najlot</Authors>
-		<Description>Map is a simple library to manage map methods.</Description>
+		<Description>Map is a simple library to manage mapping methods.</Description>
 		<PackageProjectUrl>https://github.com/najlot/Map</PackageProjectUrl>
 		<PackageIcon>icon.png</PackageIcon>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -33,8 +33,8 @@
 		</None>
 	</ItemGroup>
 
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.3" />
+	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+		<PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
 	</ItemGroup>
 
 </Project>

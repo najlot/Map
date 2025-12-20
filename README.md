@@ -24,11 +24,13 @@ dotnet add package Najlot.Map.SourceGenerator
 
 ## Source Generator Quickstart
 
-The source generator provides compile-time code generation for mapping with zero runtime overhead:
+The source generator provides compile-time code generation for mapping with zero runtime overhead.
+
+Note: The `[Mapping]` attribute is defined in the core package (`Najlot.Map`) in the `Najlot.Map.Attributes` namespace.
 
 ```csharp
 using Najlot.Map;
-using Najlot.Map.SourceGenerator;
+using Najlot.Map.Attributes;
 
 // Class-level [Mapping] generates implementations for all partial methods
 [Mapping]

@@ -4,16 +4,18 @@ namespace Najlot.Map.Tests;
 
 public class MapEnumerableTests
 {
+	private readonly string _usernamePrefix = "test";
+
 	private IEnumerable<User> GetUsers()
 	{
 		yield return new User()
 		{
-			Username = "test 1"
+			Username = _usernamePrefix + " 1"
 		};
 
 		yield return new User()
 		{
-			Username = "test 2"
+			Username = _usernamePrefix + " 2"
 		};
 	}
 
@@ -21,8 +23,7 @@ public class MapEnumerableTests
 	public void Test_Simple_Map_To_New_IEnumerable()
 	{
 		// Arrange
-		IMap map = new Map();
-		map.Register<User, UserModel>(static (from, to) =>
+		IMap map = new Map().Register<User, UserModel>(static (from, to) =>
 		{
 			to.Username = from.Username;
 		});
@@ -40,8 +41,7 @@ public class MapEnumerableTests
 	public void Test_Simple_Map_To_New_List()
 	{
 		// Arrange
-		IMap map = new Map();
-		map.Register<User, UserModel>((from, to) =>
+		IMap map = new Map().Register<User, UserModel>((from, to) =>
 		{
 			to.Username = from.Username;
 		});
@@ -59,8 +59,7 @@ public class MapEnumerableTests
 	public void Test_Simple_Map_To_New_Array()
 	{
 		// Arrange
-		IMap map = new Map();
-		map.Register<User, UserModel>((from, to) =>
+		IMap map = new Map().Register<User, UserModel>((from, to) =>
 		{
 			to.Username = from.Username;
 		});
@@ -78,8 +77,7 @@ public class MapEnumerableTests
 	public void Test_Simple_Map_To_Existing_List()
 	{
 		// Arrange
-		IMap map = new Map();
-		map.Register<User, UserModel>((from, to) =>
+		IMap map = new Map().Register<User, UserModel>((from, to) =>
 		{
 			to.Username = from.Username;
 		});
@@ -103,8 +101,7 @@ public class MapEnumerableTests
 	public void Test_Simple_Map_To_Existing_List_With_Too_Much_Items()
 	{
 		// Arrange
-		IMap map = new Map();
-		map.Register<User, UserModel>((from, to) =>
+		IMap map = new Map().Register<User, UserModel>((from, to) =>
 		{
 			to.Username = from.Username;
 		});

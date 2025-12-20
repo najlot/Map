@@ -21,8 +21,6 @@ dotnet add package Najlot.Map.SourceGenerator
 ### Models.cs
 
 ```csharp
-using Najlot.Map.SourceGenerator;
-
 namespace MapGeneratorDemo;
 
 // Domain entities
@@ -80,7 +78,7 @@ public class FeatureModel
 
 ```csharp
 using Najlot.Map;
-using Najlot.Map.SourceGenerator;
+using Najlot.Map.Attributes;
 
 namespace MapGeneratorDemo;
 
@@ -284,7 +282,7 @@ Enable this in your .csproj to see generated files in IDE:
 You can define mappings for specific methods without using the `IMap` interface if you don't need recursive mapping capabilities.
 
 ```csharp
-using Najlot.Map.SourceGenerator;
+using Najlot.Map.Attributes;
 
 public partial class OrderMapper
 {
@@ -310,7 +308,7 @@ var summary = mapper.CreateSummary(order);
 Common pattern for API controllers.
 
 ```csharp
-using Najlot.Map.SourceGenerator;
+using Najlot.Map.Attributes;
 
 public partial class ProductMapper
 {
@@ -373,7 +371,7 @@ public class UserService
 
 ```csharp
 using Najlot.Map;
-using Najlot.Map.SourceGenerator;
+using Najlot.Map.Attributes;
 
 [Mapping]
 public partial class UserMappings
@@ -404,7 +402,7 @@ public class UserService
 ### CQRS Pattern
 
 ```csharp
-using Najlot.Map.SourceGenerator;
+using Najlot.Map.Attributes;
 
 [Mapping]
 public partial class UserCommandMappings

@@ -2,64 +2,82 @@
 
 namespace Najlot.Map;
 
-internal class MapFromEnumerable<TFrom>(
-	IMap map,
+/// <summary>
+/// Maps from an enumerable.
+/// </summary>
+public readonly struct MapFromEnumerable<TFrom>(
+	Map map,
 	IEnumerable<TFrom> from,
-	FactoryMethod factory,
-	IReadOnlyDictionary<Type, Delegate> mapRegistrations,
-	IReadOnlyDictionary<Type, Delegate> mapFactoryRegistrations) : IMapFromEnumerable
+	IReadOnlyDictionary<Type, Delegate>? mapRegistrations,
+	IReadOnlyDictionary<Type, Delegate>? mapFactoryRegistrations)
 {
-	public IEnumerable<T> To<T>()
+	/// <summary>
+	/// Maps provided IEnumerable to a new IEnumerable.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
+	public readonly IEnumerable<T> To<T>()
 	{
 		var targetType = typeof(T);
 
-		MapFactoryMethod<TFrom, T> factoryMethod;
-
-		if (mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
+		if (mapFactoryRegistrations != null && mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
 		{
-			factoryMethod = (MapFactoryMethod<TFrom, T>)factoryRegistration;
+			var factoryMethod = (MapFactoryMethod<TFrom, T>)factoryRegistration;
+			foreach (var item in from)
+			{
+				yield return factoryMethod(map, item);
+			}
 		}
 		else
 		{
-			if (!mapRegistrations.TryGetValue(targetType, out var registration))
+			if (mapRegistrations == null || !mapRegistrations.TryGetValue(targetType, out var registration))
 			{
 				throw new MapNotRegisteredException(typeof(TFrom), targetType);
 			}
 
 			var method = (MapMethod<TFrom, T>)registration;
-
-			T CreateAndMap(IMap map, TFrom from)
+			foreach (var item in from)
 			{
-				var t = (T)factory(targetType);
-				method(map, from, t);
-				return t;
+				var t = map.Create<T>();
+				method(map, item, t);
+				yield return t;
 			}
-
-			factoryMethod = CreateAndMap;
-		}
-
-		foreach (var item in from)
-		{
-			yield return factoryMethod(map, item);
 		}
 	}
 
+	/// <summary>
+	/// Maps provided IEnumerable to an array.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
 	public T[] ToArray<T>()
 	{
 		return To<T>().ToArray();
 	}
 
+	/// <summary>
+	/// Maps provided IEnumerable to a List.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
 	public List<T> ToList<T>()
 	{
 		return To<T>().ToList();
 	}
 
+	/// <summary>
+	/// Maps provided IEnumerable into an existing List.
+	/// Does not work with map factories and modifies existing items.
+	/// </summary>
+	/// <typeparam name="T">Type of the elements in the list</typeparam>
+	/// <param name="to">List to map into</param>
+	/// <returns></returns>
 	public List<T> ToList<T>(List<T> to)
 	{
 		var targetType = typeof(T);
 		int count;
 
-		if (!mapRegistrations.TryGetValue(targetType, out var registration))
+		if (mapRegistrations == null || !mapRegistrations.TryGetValue(targetType, out var registration))
 		{
 			throw new MapNotRegisteredException(typeof(TFrom), targetType);
 		}
@@ -82,7 +100,8 @@ internal class MapFromEnumerable<TFrom>(
 
 		while (to.Count < count)
 		{
-			to.Add((T)factory(targetType));
+			var t = map.Create<T>();
+			to.Add(t);
 		}
 
 		int i = 0;

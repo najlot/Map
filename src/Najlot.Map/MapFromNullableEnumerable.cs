@@ -2,60 +2,82 @@
 
 namespace Najlot.Map;
 
-internal class MapFromNullableEnumerable<TFrom>(
-	IMap map,
+/// <summary>
+/// Maps from a nullable enumerable.
+/// </summary>
+public readonly struct MapFromNullableEnumerable<TFrom>(
+	Map map,
 	IEnumerable<TFrom?> from,
-	FactoryMethod factory,
-	IReadOnlyDictionary<Type, Delegate> mapRegistrations,
-	IReadOnlyDictionary<Type, Delegate> mapFactoryRegistrations) : IMapFromNullableEnumerable
+	IReadOnlyDictionary<Type, Delegate>? mapRegistrations,
+	IReadOnlyDictionary<Type, Delegate>? mapFactoryRegistrations)
 {
-	public IEnumerable<T?> To<T>()
+	/// <summary>
+	/// Maps provided IEnumerable to a new IEnumerable.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
+	public readonly IEnumerable<T?> To<T>()
 	{
 		var targetType = typeof(T);
 
-		MapFactoryMethod<TFrom, T> factoryMethod;
-
-		if (mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
+		if (mapFactoryRegistrations != null && mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
 		{
-			factoryMethod = (MapFactoryMethod<TFrom, T>)factoryRegistration;
+			var factoryMethod = (MapFactoryMethod<TFrom, T>)factoryRegistration;
+
+			foreach (var item in from)
+			{
+				if (item is null)
+				{
+					yield return default;
+				}
+				else
+				{
+					yield return factoryMethod(map, item);
+				}
+			}
 		}
 		else
 		{
-			if (!mapRegistrations.TryGetValue(targetType, out var registration))
+			if (mapRegistrations == null || !mapRegistrations.TryGetValue(targetType, out var registration))
 			{
 				throw new MapNotRegisteredException(typeof(TFrom), targetType);
 			}
 
 			var method = (MapMethod<TFrom, T>)registration;
 
-			T CreateAndMap(IMap map, TFrom from)
+			foreach (var item in from)
 			{
-				var t = (T)factory(targetType);
-				method(map, from, t);
-				return t;
-			}
-
-			factoryMethod = CreateAndMap;
-		}
-
-		foreach (var item in from)
-		{
-			if (item is null)
-			{
-				yield return default;
-			}
-			else
-			{
-				yield return factoryMethod(map, item);
+				if (item is null)
+				{
+					yield return default;
+				}
+				else
+				{
+					var t = map.Create<T>();
+					method(map, item, t);
+					yield return t;
+				}
 			}
 		}
+
+		
 	}
 
+	/// <summary>
+	/// Maps provided IEnumerable to an array.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
 	public T?[] ToArray<T>()
 	{
 		return To<T>().ToArray();
 	}
 
+	/// <summary>
+	/// Maps provided IEnumerable to a List.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
 	public List<T?> ToList<T>()
 	{
 		return To<T>().ToList();

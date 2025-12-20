@@ -82,7 +82,33 @@ public class MapFactoryTests
 	}
 
 	[Fact]
-	public void Test_Custom_Map_Factory()
+	public void Test_Custom_Map_Factory_when_alwaysUseFactory()
+	{
+		// Arrange
+		IMap map = new Map();
+		map.Register<User, UserModel>((from, to) => { });
+		map.RegisterFactory(type =>
+		{
+			if (type == typeof(UserModel))
+			{
+				return new UserModel()
+				{
+					Username = "Factory set username"
+				};
+			}
+
+			throw new InvalidOperationException("Unknown type: " + type);
+		}, alwaysUseFactory: true);
+
+		// Act
+		var result = map.From(new User() { Username = "test" }).To<UserModel>();
+
+		// Assert
+		Assert.Equal("Factory set username", result.Username);
+	}
+
+	[Fact]
+	public void Test_Custom_Map_Factory_when_not_alwaysUseFactory()
 	{
 		// Arrange
 		IMap map = new Map();
@@ -104,7 +130,7 @@ public class MapFactoryTests
 		var result = map.From(new User() { Username = "test" }).To<UserModel>();
 
 		// Assert
-		Assert.Equal("Factory set username", result.Username);
+		Assert.NotEqual("Factory set username", result.Username);
 	}
 
 	[Fact]
@@ -133,7 +159,7 @@ public class MapFactoryTests
 		}
 
 		map.Register(ClassToInterface);
-		map.RegisterFactory(TitleAndDescriptionFactory);
+		map.RegisterFactory(TitleAndDescriptionFactory, alwaysUseFactory: true);
 
 		// Act & Assert
 		ITitleAndDescription result = map

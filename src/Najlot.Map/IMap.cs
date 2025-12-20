@@ -11,7 +11,7 @@ public interface IMap
 	/// <typeparam name="T"></typeparam>
 	/// <param name="from"></param>
 	/// <returns></returns>
-	IMapFrom From<T>(T from);
+	MapFrom<T> From<T>(T from);
 
 	/// <summary>
 	/// Maps from a nullable class.
@@ -19,7 +19,7 @@ public interface IMap
 	/// <typeparam name="T"></typeparam>
 	/// <param name="from"></param>
 	/// <returns></returns>
-	IMapFrom? FromNullable<T>(T? from);
+	MapFrom<T>? FromNullable<T>(T? from);
 
 	/// <summary>
 	/// Maps from an async enumerable.
@@ -27,7 +27,7 @@ public interface IMap
 	/// <typeparam name="T"></typeparam>
 	/// <param name="from"></param>
 	/// <returns></returns>
-	IMapFromAsyncEnumerable From<T>(IAsyncEnumerable<T> from);
+	MapFromAsyncEnumerable<T> From<T>(IAsyncEnumerable<T> from);
 
 	/// <summary>
 	/// Maps from a nullable async enumerable.
@@ -35,7 +35,7 @@ public interface IMap
 	/// <typeparam name="T"></typeparam>
 	/// <param name="from"></param>
 	/// <returns></returns>
-	IMapFromNullableAsyncEnumerable FromNullable<T>(IAsyncEnumerable<T?> from);
+	MapFromNullableAsyncEnumerable<T> FromNullable<T>(IAsyncEnumerable<T?> from);
 
 	/// <summary>
 	/// Maps from an enumerable.
@@ -43,7 +43,7 @@ public interface IMap
 	/// <typeparam name="T"></typeparam>
 	/// <param name="from"></param>
 	/// <returns></returns>
-	IMapFromEnumerable From<T>(IEnumerable<T> from);
+	MapFromEnumerable<T> From<T>(IEnumerable<T> from);
 
 	/// <summary>
 	/// Maps from a nullable enumerable.
@@ -51,7 +51,7 @@ public interface IMap
 	/// <typeparam name="T"></typeparam>
 	/// <param name="from"></param>
 	/// <returns></returns>
-	IMapFromNullableEnumerable FromNullable<T>(IEnumerable<T?> from);
+	MapFromNullableEnumerable<T> FromNullable<T>(IEnumerable<T?> from);
 
 	/// <summary>
 	/// Registers a map delegate.
@@ -93,7 +93,10 @@ public interface IMap
 	/// <summary>
 	/// Registers a factory method to create object instances.
 	/// </summary>
-	IMap RegisterFactory(FactoryMethod factory);
+	/// <param name="factory">Factory method to create objects</param>
+	/// <param name="alwaysUseFactory">Whether to use the factory method for all object creations. If left false, then internal object factory will be used</param>
+	/// <returns>This instance</returns>
+	IMap RegisterFactory(FactoryMethod factory, bool alwaysUseFactory = false);
 
 	/// <summary>
 	/// Gets a registered simple map method for the specified types.

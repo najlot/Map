@@ -26,11 +26,13 @@ dotnet add package Najlot.Map.SourceGenerator
 
 ### Class-Level Mapping with IMap
 
-Apply the `[Mapping]` attribute to a partial class to generate implementations for all partial methods:
+Apply the `[Mapping]` attribute to a partial class to generate implementations for all partial methods.
+
+Note: The `[Mapping]` attribute is defined in the core package (`Najlot.Map`) in the `Najlot.Map.Attributes` namespace.
 
 ```csharp
 using Najlot.Map;
-using Najlot.Map.SourceGenerator;
+using Najlot.Map.Attributes;
 
 [Mapping]
 public partial class UserMappings
@@ -66,6 +68,8 @@ The source generator will create implementations that:
 Use `[MapIgnoreProperty]` to skip specific properties:
 
 ```csharp
+using Najlot.Map.Attributes;
+
 [Mapping]
 public partial class UserMappings
 {
@@ -80,6 +84,8 @@ public partial class UserMappings
 Apply `[Mapping]` to individual partial methods for simple mappings:
 
 ```csharp
+using Najlot.Map.Attributes;
+
 public partial class UserMapper
 {
     [Mapping]
@@ -200,6 +206,8 @@ The generator supports two types of partial methods:
 The generator automatically detects and uses custom converter methods:
 
 ```csharp
+using Najlot.Map.Attributes;
+
 [Mapping]
 public partial class UserMappings
 {
@@ -235,6 +243,8 @@ var map = new Map()
 For complex scenarios, combine generated code with manual logic:
 
 ```csharp
+using Najlot.Map.Attributes;
+
 [Mapping]
 public partial class UserMappings
 {
@@ -255,7 +265,7 @@ public void MapUserComplete(IMap map, UserModel from, User to)
 ### Generated Code Not Appearing
 
 1. Ensure your class/method is marked as `partial`
-2. Verify the `[Mapping]` attribute is applied
+2. Verify the `[Mapping]` attribute is applied (from `Najlot.Map.Attributes`)
 3. Clean and rebuild your project
 4. Check the `obj/GeneratedFiles` folder to see generated code
 

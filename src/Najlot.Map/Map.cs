@@ -7,16 +7,19 @@ namespace Najlot.Map;
 /// </summary>
 public partial class Map : IMap
 {
-	private readonly Dictionary<Type, Dictionary<Type, Delegate>> _mapRegistrations = [];
-	private readonly Dictionary<Type, Dictionary<Type, Delegate>> _mapFactoryRegistrations = [];
-	private readonly IReadOnlyDictionary<Type, Delegate> _emptyDictionary = new Dictionary<Type, Delegate>();
+	private class TypeRegistrations
+	{
+		public Dictionary<Type, Delegate>? Maps;
+		public Dictionary<Type, Delegate>? Factories;
+	}
+
+	private readonly Dictionary<Type, TypeRegistrations> _registrations = [];
 
 	private readonly List<Delegate> _mapDelegates = [];
 	private readonly List<Delegate> _mapFactoryDelegates = [];
 
-	private FactoryMethod _factory = DefaultFactory;
-	private static object DefaultFactory(Type type) => Activator.CreateInstance(type)
-		?? throw new NullReferenceException($"Activator.CreateInstance of type {type.FullName} returns null.");
+	private FactoryMethod? _factory = null;
+	private bool _alwaysUseFactory = false;
 
 	/// <summary>
 	/// Creates a new instance of the specified type.
@@ -25,7 +28,15 @@ public partial class Map : IMap
 	/// </summary>
 	/// <typeparam name="T">The type of object to create.</typeparam>
 	/// <returns>A new instance of type <typeparamref name="T"/>.</returns>
-	public T Create<T>() => (T)_factory(typeof(T));
+	public T Create<T>()
+	{
+		if (_factory is not null && (_alwaysUseFactory || !Cache<T>.HasPublicParameterlessCtor))
+		{
+			return (T)_factory(typeof(T));
+		}
+
+		return Cache<T>.Factory();
+	}
 
 	/// <summary>
 	/// Maps from a class.
@@ -34,11 +45,14 @@ public partial class Map : IMap
 	/// <param name="from">Instance of the class</param>
 	/// <returns>Class to specify to which type to map</returns>
 	/// <exception cref="MapNotRegisteredException">Thrown when map is not registered</exception>
-	public IMapFrom From<T>(T from)
+	public MapFrom<T> From<T>(T from)
 	{
-		return new MapFrom<T>(this, from, _factory,
-			_mapRegistrations.TryGetValue(typeof(T), out var registrations) ? registrations : _emptyDictionary,
-			_mapFactoryRegistrations.TryGetValue(typeof(T), out var factoryRegistrations) ? factoryRegistrations : _emptyDictionary);
+		if (_registrations.TryGetValue(typeof(T), out var regs))
+		{
+			return new MapFrom<T>(this, from, regs.Maps, regs.Factories);
+		}
+
+		return new MapFrom<T>(this, from, null, null);
 	}
 
 	/// <summary>
@@ -48,16 +62,19 @@ public partial class Map : IMap
 	/// <param name="from">Instance of the class</param>
 	/// <returns>Class to specify to which type to map</returns>
 	/// <exception cref="MapNotRegisteredException">Thrown when map is not registered</exception>
-	public IMapFrom? FromNullable<T>(T? from)
+	public MapFrom<T>? FromNullable<T>(T? from)
 	{
 		if (from is null)
 		{
 			return null;
 		}
 
-		return new MapFrom<T>(this, from, _factory,
-			_mapRegistrations.TryGetValue(typeof(T), out var registrations) ? registrations : _emptyDictionary,
-			_mapFactoryRegistrations.TryGetValue(typeof(T), out var factoryRegistrations) ? factoryRegistrations : _emptyDictionary);
+		if (_registrations.TryGetValue(typeof(T), out var regs))
+		{
+			return new MapFrom<T>(this, from, regs.Maps, regs.Factories);
+		}
+
+		return new MapFrom<T>(this, from, null, null);
 	}
 
 	/// <summary>
@@ -67,11 +84,14 @@ public partial class Map : IMap
 	/// <param name="from">Enumerable containing source classes</param>
 	/// <returns>Class to specify to which type to map</returns>
 	/// <exception cref="MapNotRegisteredException">Thrown when map is not registered.</exception>
-	public IMapFromEnumerable From<T>(IEnumerable<T> from)
+	public MapFromEnumerable<T> From<T>(IEnumerable<T> from)
 	{
-		return new MapFromEnumerable<T>(this, from, _factory,
-			_mapRegistrations.TryGetValue(typeof(T), out var registrations) ? registrations : _emptyDictionary,
-			_mapFactoryRegistrations.TryGetValue(typeof(T), out var factoryRegistrations) ? factoryRegistrations : _emptyDictionary);
+		if (_registrations.TryGetValue(typeof(T), out var regs))
+		{
+			return new MapFromEnumerable<T>(this, from, regs.Maps, regs.Factories);
+		}
+
+		return new MapFromEnumerable<T>(this, from, null, null);
 	}
 
 	/// <summary>
@@ -81,11 +101,14 @@ public partial class Map : IMap
 	/// <param name="from">Enumerable containing source classes</param>
 	/// <returns>Class to specify to which type to map</returns>
 	/// <exception cref="MapNotRegisteredException">Thrown when map is not registered.</exception>
-	public IMapFromNullableEnumerable FromNullable<T>(IEnumerable<T?> from)
+	public MapFromNullableEnumerable<T> FromNullable<T>(IEnumerable<T?> from)
 	{
-		return new MapFromNullableEnumerable<T>(this, from, _factory,
-			_mapRegistrations.TryGetValue(typeof(T), out var registrations) ? registrations : _emptyDictionary,
-			_mapFactoryRegistrations.TryGetValue(typeof(T), out var factoryRegistrations) ? factoryRegistrations : _emptyDictionary);
+		if (_registrations.TryGetValue(typeof(T), out var regs))
+		{
+			return new MapFromNullableEnumerable<T>(this, from, regs.Maps, regs.Factories);
+		}
+
+		return new MapFromNullableEnumerable<T>(this, from, null, null);
 	}
 
 	/// <summary>
@@ -95,11 +118,14 @@ public partial class Map : IMap
 	/// <param name="from">Async enumerable containing source classes</param>
 	/// <returns>Class to specify to which type to map</returns>
 	/// <exception cref="MapNotRegisteredException">Thrown when map is not registered.</exception>
-	public IMapFromAsyncEnumerable From<T>(IAsyncEnumerable<T> from)
+	public MapFromAsyncEnumerable<T> From<T>(IAsyncEnumerable<T> from)
 	{
-		return new MapFromAsyncEnumerable<T>(this, from, _factory,
-			_mapRegistrations.TryGetValue(typeof(T), out var registrations) ? registrations : _emptyDictionary,
-			_mapFactoryRegistrations.TryGetValue(typeof(T), out var factoryRegistrations) ? factoryRegistrations : _emptyDictionary);
+		if (_registrations.TryGetValue(typeof(T), out var regs))
+		{
+			return new MapFromAsyncEnumerable<T>(this, from, regs.Maps, regs.Factories);
+		}
+
+		return new MapFromAsyncEnumerable<T>(this, from, null, null);
 	}
 
 	/// <summary>
@@ -109,11 +135,14 @@ public partial class Map : IMap
 	/// <param name="from">Async enumerable containing source classes</param>
 	/// <returns>Class to specify to which type to map</returns>
 	/// <exception cref="MapNotRegisteredException">Thrown when map is not registered.</exception>
-	public IMapFromNullableAsyncEnumerable FromNullable<T>(IAsyncEnumerable<T?> from)
+	public MapFromNullableAsyncEnumerable<T> FromNullable<T>(IAsyncEnumerable<T?> from)
 	{
-		return new MapFromNullableAsyncEnumerable<T>(this, from, _factory,
-			_mapRegistrations.TryGetValue(typeof(T), out var registrations) ? registrations : _emptyDictionary,
-			_mapFactoryRegistrations.TryGetValue(typeof(T), out var factoryRegistrations) ? factoryRegistrations : _emptyDictionary);
+		if (_registrations.TryGetValue(typeof(T), out var regs))
+		{
+			return new MapFromNullableAsyncEnumerable<T>(this, from, regs.Maps, regs.Factories);
+		}
+
+		return new MapFromNullableAsyncEnumerable<T>(this, from, null, null);
 	}
 
 	public IMap Register<TFrom, TTo>(SimpleMapFactoryMethod<TFrom, TTo> method)
@@ -137,14 +166,21 @@ public partial class Map : IMap
 			throw new ArgumentNullException(nameof(method));
 		}
 
-		RegisterIntoDictionary(_mapFactoryRegistrations, typeof(TFrom), typeof(TTo), method);
+		RegisterFactoryMapInternal(method);
 		_mapFactoryDelegates.Add(method);
 		return this;
 	}
 
 	private void RegisterFactoryMapInternal<TFrom, TTo>(MapFactoryMethod<TFrom, TTo> method)
 	{
-		RegisterIntoDictionary(_mapFactoryRegistrations, typeof(TFrom), typeof(TTo), method);
+		if (!_registrations.TryGetValue(typeof(TFrom), out var regs))
+		{
+			regs = new TypeRegistrations();
+			_registrations[typeof(TFrom)] = regs;
+		}
+
+		regs.Factories ??= [];
+		regs.Factories[typeof(TTo)] = method;
 	}
 
 	/// <summary>
@@ -173,7 +209,14 @@ public partial class Map : IMap
 
 	private void RegisterInternal<TFrom, TTo>(MapMethod<TFrom, TTo> method)
 	{
-		RegisterIntoDictionary(_mapRegistrations, typeof(TFrom), typeof(TTo), method);
+		if (!_registrations.TryGetValue(typeof(TFrom), out var regs))
+		{
+			regs = new TypeRegistrations();
+			_registrations[typeof(TFrom)] = regs;
+		}
+
+		regs.Maps ??= [];
+		regs.Maps[typeof(TTo)] = method;
 	}
 
 	/// <summary>
@@ -185,34 +228,21 @@ public partial class Map : IMap
 	/// <returns></returns>
 	public IMap Register<TFrom, TTo>(MapMethod<TFrom, TTo> method)
 	{
-		RegisterIntoDictionary(_mapRegistrations, typeof(TFrom), typeof(TTo), method);
+		RegisterInternal(method);
 		_mapDelegates.Add(method);
 		return this;
-	}
-
-	private void RegisterIntoDictionary(
-		Dictionary<Type, Dictionary<Type, Delegate>> dictionary,
-		Type from,
-		Type to,
-		Delegate method)
-	{
-		if (!dictionary.TryGetValue(from, out var registrations))
-		{
-			registrations = [];
-			dictionary[from] = registrations;
-		}
-
-		registrations[to] = method;
 	}
 
 	/// <summary>
 	/// Registers a factory method to create object instances.
 	/// </summary>
-	/// <param name="factory"></param>
+	/// <param name="factory">Factory method to create objects</param>
+	/// <param name="alwaysUseFactory">Whether to use the factory method for all object creations. If left false, then internal object factory will be used</param>
 	/// <returns>This instance</returns>
-	public IMap RegisterFactory(FactoryMethod factory)
+	public IMap RegisterFactory(FactoryMethod factory, bool alwaysUseFactory = false)
 	{
 		_factory = factory;
+		_alwaysUseFactory = alwaysUseFactory;
 		return this;
 	}
 
@@ -224,8 +254,9 @@ public partial class Map : IMap
 	/// <returns>The simple map method if registered, otherwise null</returns>
 	public SimpleMapMethod<TFrom, TTo> GetMethod<TFrom, TTo>()
 	{
-		if (_mapRegistrations.TryGetValue(typeof(TFrom), out var registrations)
-			&& registrations.TryGetValue(typeof(TTo), out var registration))
+		if (_registrations.TryGetValue(typeof(TFrom), out var regs)
+			&& regs.Maps != null
+			&& regs.Maps.TryGetValue(typeof(TTo), out var registration))
 		{
 			var method = (MapMethod<TFrom, TTo>)registration;
 			return (TFrom from, TTo to) => method(this, from, to);
@@ -242,24 +273,26 @@ public partial class Map : IMap
 	/// <returns>The simple map factory method if registered, otherwise null</returns>
 	public SimpleMapFactoryMethod<TFrom, TTo> GetFactoryMethod<TFrom, TTo>()
 	{
-		var factory = _factory;
-		if (_mapFactoryRegistrations.TryGetValue(typeof(TFrom), out var factoryRegistrations)
-			&& factoryRegistrations.TryGetValue(typeof(TTo), out var factoryRegistration))
+		if (_registrations.TryGetValue(typeof(TFrom), out var regs))
 		{
-			var factoryMethod = (MapFactoryMethod<TFrom, TTo>)factoryRegistration;
-			return (TFrom from) => factoryMethod(this, from);
-		}
-
-		if (_mapRegistrations.TryGetValue(typeof(TFrom), out var registrations)
-			&& registrations.TryGetValue(typeof(TTo), out var registration))
-		{
-			var method = (MapMethod<TFrom, TTo>)registration;
-			return (TFrom from) =>
+			if (regs.Factories != null
+				&& regs.Factories.TryGetValue(typeof(TTo), out var factoryRegistration))
 			{
-				var to = (TTo)factory(typeof(TTo));
-				method(this, from, to);
-				return to;
-			};
+				var factoryMethod = (MapFactoryMethod<TFrom, TTo>)factoryRegistration;
+				return (TFrom from) => factoryMethod(this, from);
+			}
+
+			if (regs.Maps != null
+				&& regs.Maps.TryGetValue(typeof(TTo), out var registration))
+			{
+				var method = (MapMethod<TFrom, TTo>)registration;
+				return (TFrom from) =>
+				{
+					var to = Create<TTo>();
+					method(this, from, to);
+					return to;
+				};
+			}
 		}
 
 		throw new MapNotRegisteredException(typeof(TFrom), typeof(TTo));

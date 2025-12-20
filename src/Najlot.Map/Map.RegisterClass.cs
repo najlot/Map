@@ -12,7 +12,7 @@ public partial class Map
 	/// <returns>This instance</returns>
 	public IMap Register<T>()
 	{
-		var maps = (T)_factory(typeof(T));
+		var maps = Create<T>();
 		return Register(maps);
 	}
 
@@ -76,7 +76,7 @@ public partial class Map
 
 			if (convertToMapFactoryMethod.MakeGenericMethod(parameterTypes).Invoke(null, [simpleMapDelegate]) is Delegate mapDelegate)
 			{
-				RegisterIntoDictionary(_mapFactoryRegistrations, parameterTypes[0], parameterTypes[1], mapDelegate);
+				RegisterFactory(parameterTypes[0], parameterTypes[1], mapDelegate);
 				_mapFactoryDelegates.Add(simpleMapDelegate);
 			}
 		}
@@ -95,7 +95,7 @@ public partial class Map
 				mapDelegate = method.CreateDelegate(typeof(MapFactoryMethod<,>).MakeGenericType(parameterTypes[0], parameterTypes[1]), maps);
 			}
 
-			RegisterIntoDictionary(_mapFactoryRegistrations, parameterTypes[0], parameterTypes[1], mapDelegate);
+			RegisterFactory(parameterTypes[0], parameterTypes[1], mapDelegate);
 			_mapFactoryDelegates.Add(mapDelegate);
 		}
 	}
@@ -121,7 +121,7 @@ public partial class Map
 
 			if (convertToMapMethod.MakeGenericMethod(parameterTypes).Invoke(null, [simpleMapDelegate]) is Delegate mapDelegate)
 			{
-				RegisterIntoDictionary(_mapRegistrations, parameterTypes[0], parameterTypes[1], mapDelegate);
+				RegisterMap(parameterTypes[0], parameterTypes[1], mapDelegate);
 				_mapDelegates.Add(simpleMapDelegate);
 			}
 		}
@@ -140,9 +140,33 @@ public partial class Map
 				mapDelegate = method.CreateDelegate(typeof(MapMethod<,>).MakeGenericType(parameterTypes[0], parameterTypes[1]), maps);
 			}
 
-			RegisterIntoDictionary(_mapRegistrations, parameterTypes[0], parameterTypes[1], mapDelegate);
+			RegisterMap(parameterTypes[0], parameterTypes[1], mapDelegate);
 			_mapDelegates.Add(mapDelegate);
 		}
+	}
+
+	private void RegisterMap(Type from, Type to, Delegate method)
+	{
+		if (!_registrations.TryGetValue(from, out var regs))
+		{
+			regs = new TypeRegistrations();
+			_registrations[from] = regs;
+		}
+
+		regs.Maps ??= [];
+		regs.Maps[to] = method;
+	}
+
+	private void RegisterFactory(Type from, Type to, Delegate method)
+	{
+		if (!_registrations.TryGetValue(from, out var regs))
+		{
+			regs = new TypeRegistrations();
+			_registrations[from] = regs;
+		}
+
+		regs.Factories ??= [];
+		regs.Factories[to] = method;
 	}
 
 	private static Delegate ConvertToMapFactoryMethod<TFrom, TTo>(Delegate simpleMapDelegate)

@@ -2,45 +2,43 @@
 
 namespace Najlot.Map;
 
-internal class MapFromAsyncEnumerable<TFrom>(
-	IMap map,
+public readonly struct MapFromAsyncEnumerable<TFrom>(
+	Map map,
 	IAsyncEnumerable<TFrom> from,
-	FactoryMethod factory,
-	IReadOnlyDictionary<Type, Delegate> mapRegistrations,
-	IReadOnlyDictionary<Type, Delegate> mapFactoryRegistrations) : IMapFromAsyncEnumerable
+	IReadOnlyDictionary<Type, Delegate>? mapRegistrations,
+	IReadOnlyDictionary<Type, Delegate>? mapFactoryRegistrations)
 {
-	public async IAsyncEnumerable<T> To<T>()
+	/// <summary>
+	/// Maps provided IAsyncEnumerable to a new IAsyncEnumerable.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
+	public async readonly IAsyncEnumerable<T> To<T>()
 	{
 		var targetType = typeof(T);
 
-		MapFactoryMethod<TFrom, T> factoryMethod;
-
-		if (mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
+		if (mapFactoryRegistrations != null && mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
 		{
-			factoryMethod = (MapFactoryMethod<TFrom, T>)factoryRegistration;
+			var factoryMethod = (MapFactoryMethod<TFrom, T>)factoryRegistration;
+			await foreach (var item in from)
+			{
+				yield return factoryMethod(map, item);
+			}
 		}
 		else
 		{
-			if (!mapRegistrations.TryGetValue(targetType, out var registration))
+			if (mapRegistrations == null || !mapRegistrations.TryGetValue(targetType, out var registration))
 			{
 				throw new MapNotRegisteredException(typeof(TFrom), targetType);
 			}
 
 			var method = (MapMethod<TFrom, T>)registration;
-
-			T CreateAndMap(IMap map, TFrom from)
+			await foreach (var item in from)
 			{
-				var t = (T)factory(targetType);
-				method(map, from, t);
-				return t;
+				var t = map.Create<T>();
+				method(map, item, t);
+				yield return t;
 			}
-
-			factoryMethod = CreateAndMap;
-		}
-
-		await foreach (var item in from)
-		{
-			yield return factoryMethod(map, item);
 		}
 	}
 }

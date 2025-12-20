@@ -2,30 +2,43 @@
 
 namespace Najlot.Map;
 
-internal class MapFrom<TFrom>(
-	IMap map,
+/// <summary>
+/// Maps from a class.
+/// </summary>
+public readonly struct MapFrom<TFrom>(
+	Map map,
 	TFrom from,
-	FactoryMethod factory,
-	IReadOnlyDictionary<Type, Delegate> mapRegistrations,
-	IReadOnlyDictionary<Type, Delegate> mapFactoryRegistrations) : IMapFrom
+	IReadOnlyDictionary<Type, Delegate>? mapRegistrations,
+	IReadOnlyDictionary<Type, Delegate>? mapFactoryRegistrations)
 {
-	public T To<T>()
+	/// <summary>
+	/// Maps to a new class.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <returns></returns>
+	public readonly T To<T>()
 	{
 		var targetType = typeof(T);
 
-		if (mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
+		if (mapFactoryRegistrations != null && mapFactoryRegistrations.TryGetValue(targetType, out var factoryRegistration))
 		{
 			var factoryMethod = (MapFactoryMethod<TFrom, T>)factoryRegistration;
 			return factoryMethod(map, from);
 		}
 
-		var t = (T)factory(targetType);
+		var t = map.Create<T>();
 		return To(t);
 	}
 
-	public T To<T>(T to)
+	/// <summary>
+	/// Maps to an existing class.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <param name="to"></param>
+	/// <returns></returns>
+	public readonly T To<T>(T to)
 	{
-		if (!mapRegistrations.TryGetValue(typeof(T), out var registration))
+		if (mapRegistrations == null || !mapRegistrations.TryGetValue(typeof(T), out var registration))
 		{
 			throw new MapNotRegisteredException(typeof(TFrom), typeof(T));
 		}
@@ -35,7 +48,13 @@ internal class MapFrom<TFrom>(
 		return to;
 	}
 
-	public T? ToNullable<T>(T? to)
+	/// <summary>
+	/// Maps to an existing nullable class.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <param name="to"></param>
+	/// <returns></returns>
+	public readonly T? ToNullable<T>(T? to)
 	{
 		if (to is null)
 		{

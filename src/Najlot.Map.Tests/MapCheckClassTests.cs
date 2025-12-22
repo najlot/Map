@@ -144,6 +144,7 @@ public class MapCheckClassTests
 
 		// Act & Assert
 		var exception = Assert.Throws<MapMissPropertiesException>(() => map.Validate());
+		Assert.Contains($"{nameof(InvalidInterfaceMapMethods)}.{nameof(InvalidInterfaceMapMethods.ClassToInterface)}", exception.Message);
 		Assert.Contains(nameof(ITitleAndDescription.Title), exception.Message);
 		Assert.Contains(nameof(ITitleAndDescription.Description), exception.Message);
 	}

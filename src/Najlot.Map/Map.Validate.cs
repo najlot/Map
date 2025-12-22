@@ -8,9 +8,15 @@ namespace Najlot.Map;
 
 public partial class Map
 {
-	private bool HasIgnoreNethodAttribute(Delegate @delegate)
+	private static bool HasIgnoreMethodAttribute(Delegate @delegate)
 	{
 		return @delegate.Method.CustomAttributes.Any(a => a.AttributeType == typeof(MapIgnoreMethodAttribute));
+	}
+
+	private static bool HasValidateSourceAttribute(MethodInfo method)
+	{
+		return method.CustomAttributes.Any(a => a.AttributeType == typeof(MapValidateSourceAttribute)) ||
+			   (method.DeclaringType != null && method.DeclaringType.CustomAttributes.Any(a => a.AttributeType == typeof(MapValidateSourceAttribute)));
 	}
 
 	public void Validate()
@@ -19,7 +25,7 @@ public partial class Map
 
 		foreach (var @delegate in _mapDelegates)
 		{
-			if (HasIgnoreNethodAttribute(@delegate))
+			if (HasIgnoreMethodAttribute(@delegate))
 			{
 				continue;
 			}
@@ -29,7 +35,7 @@ public partial class Map
 
 		foreach (var @delegate in _mapFactoryDelegates)
 		{
-			if (HasIgnoreNethodAttribute(@delegate))
+			if (HasIgnoreMethodAttribute(@delegate))
 			{
 				continue;
 			}
@@ -88,15 +94,33 @@ public partial class Map
 		var sourceType = sourceParameter.ParameterType;
 		var targetType = targetParameter.ParameterType;
 
-		var assignedProperties = GetCalledTargetProperties(method, sourceType, targetType, new HashSet<MethodInfo>()).ToArray();
-		var ignoredProperties = GetIgnoredProperties(method, sourceType, targetType, new HashSet<MethodInfo>()).ToArray();
+		bool isSourceValidation = HasValidateSourceAttribute(method);
+		IEnumerable<string> mappedProperties;
+		IEnumerable<string> unmappedPropertiesEnumerable;
+		var ignoredProperties = GetIgnoredProperties(method, sourceType, targetType, []).ToArray();
 
-		var unmappedProperties = targetType
-			.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty)
-			.Where(p => p.CanWrite && p.SetMethod != null && p.SetMethod.IsPublic)
-			.Select(p => p.Name)
-			.Where(p => !(assignedProperties.Contains(p) || ignoredProperties.Contains(p)))
-			.ToArray();
+		if (isSourceValidation)
+		{
+			mappedProperties = GetReadSourceProperties(method, sourceType, targetType, []).ToArray();
+
+			unmappedPropertiesEnumerable = sourceType
+				.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.GetProperty)
+				.Where(p => p.CanRead && p.GetMethod != null && p.GetMethod.IsPublic)
+				.Select(p => p.Name)
+				.Where(p => !(mappedProperties.Contains(p) || ignoredProperties.Contains(p)));
+		}
+		else
+		{
+			mappedProperties = GetCalledTargetProperties(method, sourceType, targetType, []).ToArray();
+
+			unmappedPropertiesEnumerable = targetType
+				.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty)
+				.Where(p => p.CanWrite && p.SetMethod != null && p.SetMethod.IsPublic)
+				.Select(p => p.Name)
+				.Where(p => !(mappedProperties.Contains(p) || ignoredProperties.Contains(p)));
+		}
+
+		var unmappedProperties = unmappedPropertiesEnumerable.ToArray();
 
 		if (unmappedProperties.Length > 0)
 		{
@@ -107,8 +131,12 @@ public partial class Map
 				.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.GetProperty)
 				.Select(p => p.Name)
 				.ToArray();
+			var targetProperties = targetType
+				.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty)
+				.Select(p => p.Name)
+				.ToArray();
 
-			sb.AppendLine($"Method {declaringTypeName}.{method.Name}({string.Join(", ", parameters.Select(p => $"{p.ParameterType.FullName} {p.Name}"))}) does not map the following properties:");
+			sb.AppendLine($"Method {declaringTypeName}{method.Name}({string.Join(", ", parameters.Select(p => $"{p.ParameterType.FullName} {p.Name}"))}) does not map the following properties:");
 
 			foreach (var property in unmappedProperties)
 			{
@@ -120,20 +148,37 @@ public partial class Map
 
 			var targetAssignment = string.IsNullOrEmpty(targetParameter.Name) ? "" : targetParameter.Name + ".";
 			var suffix = string.IsNullOrEmpty(targetParameter.Name) ? "," : ";";
-			foreach (var property in unmappedProperties.Where(p => sourceProperties.Contains(p)))
+
+			var otherSideProperties = isSourceValidation ? targetProperties : sourceProperties;
+
+			foreach (var property in unmappedProperties.Where(p => otherSideProperties.Contains(p)))
 			{
 				sb.AppendLine($"\t{targetAssignment}{property} = {sourceParameter.Name}.{property}{suffix}");
 			}
 
-			foreach (var property in unmappedProperties.Where(p => !sourceProperties.Contains(p)))
+			foreach (var property in unmappedProperties.Where(p => !otherSideProperties.Contains(p)))
 			{
 				if (method.ReturnType == typeof(void))
 				{
-					sb.AppendLine($"\t[MapIgnoreProperty(nameof({targetParameter.Name}.{property}))]");
+					if (isSourceValidation)
+					{
+						sb.AppendLine($"\t[MapIgnoreProperty(nameof({sourceParameter.Name}.{property}))]");
+					}
+					else
+					{
+						sb.AppendLine($"\t[MapIgnoreProperty(nameof({targetParameter.Name}.{property}))]");
+					}
 				}
 				else
 				{
-					sb.AppendLine($"\t[MapIgnoreProperty(nameof({targetType.FullName}.{property}))]");
+					if (isSourceValidation)
+					{
+						sb.AppendLine($"\t[MapIgnoreProperty(nameof({sourceType.FullName}.{property}))]");
+					}
+					else
+					{
+						sb.AppendLine($"\t[MapIgnoreProperty(nameof({targetType.FullName}.{property}))]");
+					}
 				}
 			}
 
@@ -192,6 +237,33 @@ public partial class Map
 		foreach (var calledMethod in GetCalledMappingMethods(method, sourceType, targetType))
 		{
 			foreach (var prop in GetCalledTargetProperties(calledMethod, sourceType, targetType, visitedMethods))
+			{
+				yield return prop;
+			}
+		}
+	}
+
+	private IEnumerable<string> GetReadSourceProperties(MethodInfo method, Type sourceType, Type targetType, HashSet<MethodInfo> visitedMethods)
+	{
+		// Avoid infinite recursion
+		if (!visitedMethods.Add(method))
+		{
+			yield break;
+		}
+
+		// Get directly read properties from this method
+		foreach (var calledMethod in GetReadProperties(method))
+		{
+			if (calledMethod.DeclaringType == sourceType)
+			{
+				yield return calledMethod.Name.Substring(4);
+			}
+		}
+
+		// Get read properties from called mapping methods
+		foreach (var calledMethod in GetCalledMappingMethods(method, sourceType, targetType))
+		{
+			foreach (var prop in GetReadSourceProperties(calledMethod, sourceType, targetType, visitedMethods))
 			{
 				yield return prop;
 			}
@@ -287,10 +359,25 @@ public partial class Map
 			return [];
 		}
 
-		return GetProperties(module, il);
+		return GetProperties(module, il, "set_");
 	}
 
-	private IEnumerable<MethodInfo> GetProperties(Module module, byte[] il)
+	private IEnumerable<MethodInfo> GetReadProperties(MethodInfo method)
+	{
+		var body = method.GetMethodBody();
+		Module module = method.Module;
+
+		byte[]? il = body?.GetILAsByteArray();
+
+		if (il is null)
+		{
+			return [];
+		}
+
+		return GetProperties(module, il, "get_");
+	}
+
+	private IEnumerable<MethodInfo> GetProperties(Module module, byte[] il, string prefix)
 	{
 		var operandType = OperandType.InlineNone;
 
@@ -305,7 +392,7 @@ public partial class Map
 				var calledMethod = module.ResolveMethod(metadataToken) as MethodInfo;
 				if (calledMethod is not null
 					&& calledMethod.IsSpecialName
-					&& calledMethod.Name.StartsWith("set_"))
+					&& calledMethod.Name.StartsWith(prefix))
 				{
 					yield return calledMethod;
 				}

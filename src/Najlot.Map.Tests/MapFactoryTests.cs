@@ -51,13 +51,13 @@ public class MapFactoryTests
 	{
 		// Arrange
 		IMap map = new Map();
-		map.Register<User, UserModel>(from
+		map.Register<User, UserModel>(static from
 			=> new UserModel
 			{
 				Username = from.Username
 			});
 
-		map.Register<Session, SessionModel>((map, from)
+		map.Register<Session, SessionModel>(static (map, from)
 			=> new SessionModel()
 			{
 				Id = from.Id,

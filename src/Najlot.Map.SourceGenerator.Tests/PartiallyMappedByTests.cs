@@ -20,7 +20,7 @@ public class PartiallyMappedByTests
 		var userService = new TestUserService();
 
 		var map = new Map()
-			.Register<TestUserViewModelMappings>()
+			.RegisterNajlotMapSourceGeneratorTestsMappings()
 			.RegisterFactory(t =>
 			{
 				if (t == typeof(TestUserViewModel)) return new TestUserViewModel(userService);

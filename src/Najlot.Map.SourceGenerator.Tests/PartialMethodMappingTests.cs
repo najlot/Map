@@ -46,15 +46,7 @@ public class PartialMethodMappingTests
 		var target = new TestUser() { CurrentSessionId = sessionId };
 
 		var map = new Map()
-			.Register<UserMappingMethods>()
-			.RegisterFactory(t =>
-			{
-				if (t == typeof(TestUser)) return new TestUser();
-				if (t == typeof(TestUserFeature)) return new TestUserFeature();
-				if (t == typeof(TestUserAddress)) return new TestUserAddress();
-
-				throw new InvalidOperationException($"No factory registered for type {t.FullName}");
-			});
+			.Register<UserMappingMethods>();
 
 		// Act
 		map.From(source).To(target);

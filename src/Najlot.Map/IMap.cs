@@ -76,14 +76,14 @@ public interface IMap
 	IMap Register<TFrom, TTo>(MapFactoryMethod<TFrom, TTo> method);
 
 	/// <summary>
-	/// Registers all map delegates in a new class.
+	/// Registers all public map delegates in a new class.
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	/// <returns></returns>
 	IMap Register<T>();
 
 	/// <summary>
-	/// Registers all map delegates in a class.
+	/// Registers all public map delegates in a class.
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	/// <param name="maps"></param>

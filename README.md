@@ -1,158 +1,211 @@
-# ![M](images/icon.png) MAP
-Map is a simple library to manage mapping methods.
+# ![M](https://github.com/najlot/Map/blob/main/images/icon.png) Najlot.Map
 
-## NuGet Packages
-This library is distributed as NuGet packages.
+**Najlot.Map** is a lightweight, high-performance object-to-object mapping library for .NET.
+It combines the simplicity of a central mapping container with the performance of handwritten mapping code.
 
-### Core Library
+The library is designed to:
+
+* avoid reflection at runtime,
+* keep mappings explicit and readable,
+* scale from handwritten mappings to compile-time generated mappings.
+
+---
+
+## Features
+
+* Explicit, method-based mappings
+* Central `IMap` container
+* Zero magic at runtime
+* Optional **Roslyn Source Generator**
+* Mapping validation for test environments
+* Collection and nested object mapping
+* Custom converters
+* Dependency injection support
+
+---
+
+## Packages
+
+Najlot.Map is distributed as two NuGet packages:
+
+| Package                      | Description                     |
+| ---------------------------- | ------------------------------- |
+| `Najlot.Map`                 | Core mapping infrastructure     |
+| `Najlot.Map.SourceGenerator` | Compile-time mapping generation |
+
+---
+
+## Installation
+
+### Core library
+
 ```bash
 dotnet add package Najlot.Map
 ```
 
-### Source Generator
+### Source generator (optional)
+
 ```bash
 dotnet add package Najlot.Map.SourceGenerator
 ```
 
-## Features
-- Efficient and fast.
-- Debuggable mappings.
-- Supports complex mappings.
-- Flexible and easy to use.
-- Mapping validation and map assistance with the Map.Validate method.
-- Compile-time code generation with incremental source generator.
+---
 
-## Source Generator Quickstart
+## Core Concepts
 
-The source generator provides compile-time code generation for mapping with zero runtime overhead.
+* **Mappings are methods**, not configuration.
+* **Only public methods are registered**.
+* `IMap` is the single entry point for all mappings.
+* Mappings can be validated during testing.
 
-Note: The `[Mapping]` attribute is defined in the core package (`Najlot.Map`) in the `Najlot.Map.Attributes` namespace.
+---
+
+## Manual Mapping Example
+
+You can write mapping methods manually without the source generator.
+
+```csharp
+internal class UserMapMethods
+{
+    [MapIgnoreProperty(nameof(User.Password))]
+    public void MapModelToUser(IMap map, UserModel from, User to)
+    {
+        to.Id = from.Id;
+        to.Username = from.Username;
+        to.Features = map
+            .From<UserFeatureModel>(from.Features)
+            .ToList<UserFeature>();
+    }
+
+    [MapIgnoreProperty(nameof(UserModel.Password))]
+    public UserModel MapUserToModel(IMap map, User from) => new()
+    {
+        Id = from.Id,
+        Username = from.Username,
+        Features = map
+            .From<UserFeature>(from.Features)
+            .To<UserFeatureModel>()
+    };
+
+    [MapIgnoreMethod]
+    public Guid IgnoredMethod(UserModel from) => from.Id;
+}
+```
+
+---
+
+## Registering Mappings
+
+### Manual Registration
+
+```csharp
+var map = new Map()
+    .Register<UserMapMethods>()
+    .RegisterFactory(type => IocContainer.Resolve(type));
+```
+
+### Auto-Registration (Source Generator)
+
+The source generator creates an extension method `Register{AssemblyName}Mappings()` that registers all classes marked with `[Mapping]`.
+
+```csharp
+var map = new Map()
+    .RegisterMyProjectMappings() // Assuming assembly name is "MyProject"
+    .RegisterFactory(type => IocContainer.Resolve(type));
+```
+
+### Mapping Objects
+
+```csharp
+var model = map.From(user).To<UserModel>();
+```
+
+### Mapping Collections
+
+```csharp
+var models = map.From<User>(users).To<UserModel>();
+```
+
+---
+
+## Mapping Validation (Tests Only)
+
+`Validate()` compares destination properties with used mappings and throws when mappings are incomplete.
+
+```csharp
+map.Validate();
+```
+
+> ⚠️ Recommended **only in unit tests**, not in production.
+
+---
+
+## Source Generator
+
+The source generator creates mapping implementations at **compile time**.
+
+### Example
 
 ```csharp
 using Najlot.Map;
 using Najlot.Map.Attributes;
 
-// Class-level [Mapping] generates implementations for all partial methods
 [Mapping]
 public partial class UserMappings
 {
-    // You can use any method name - not restricted to "MapFrom"
     public partial void MapUser(IMap map, UserModel from, User to);
     public partial void MapFeature(IMap map, FeatureModel from, Feature to);
-    
-	// Generator detects private partial methods too, but the IMap.Register call won't register them
-	private partial void PartialMapAddress(IMap map, AddressModel from, AddressViewModel to);
-	// That may you can do something like this:
-	public void MapAddress(IMap map, AddressModel from, AddressViewModel to)
-	{
-		// Before mapping logic (or custom mapping) here...
-		PartialMapAddress(map, from, to);
-		// After mapping logic (or custom mapping) here...
-	}
 
-    // Custom converter - automatically detected and used
-    public DateTime ConvertToUtc(DateTimeOffset offset) => offset.UtcDateTime;
+    private partial void PartialMapAddress(
+        IMap map,
+        AddressModel from,
+        AddressViewModel to);
+
+    public void MapAddress(
+        IMap map,
+        AddressModel from,
+        AddressViewModel to)
+    {
+        // Custom logic before
+        PartialMapAddress(map, from, to);
+        // Custom logic after
+    }
+
+    // Custom converter (auto-detected)
+    public DateTime ConvertToUtc(DateTimeOffset offset)
+        => offset.UtcDateTime;
 }
-
-// Register and use with IMap
-var map = new Map()
-    .Register<UserMappings>()
-    .RegisterFactory(type => /* your factory logic */);
-
-var userModel = new UserModel { /* ... */ };
-var user = new User();
-map.From(userModel).To(user); // Uses generated mapping
-
-// Method-level [Mapping] for simple mappings
-public partial class UserMapper
-{
-    [Mapping]
-    public partial UserDto ConvertToDto(User user);
-}
-
-var mapper = new UserMapper();
-var dto = mapper.ConvertToDto(user); // Uses generated implementation
 ```
 
-### Key Features
-
-- **Flexible naming**: Use any method names that make sense for your domain
-- **IMap integration**: Automatically uses `IMap` for complex types and collections
-- **Factory support**: Respects factories registered with `IMap.RegisterFactory`
-- **Custom converters**: Detects and uses custom type conversion methods
-- **Smart null handling**: Proper null checking with factory-aware object creation
-- **Property ignoring**: Use `[MapIgnoreProperty]` to skip specific properties
-
-For more information about the source generator, see [Najlot.Map.SourceGenerator README](src/Najlot.Map.SourceGenerator/README.md).
-
-## Runtime Mapping Quickstart
-Following classes will give you an idea of how this library can be used.
-For more information, see the unit tests or open an issue.
+### Usage
 
 ```csharp
-/// <summary>
-/// Class with methods for mapping User to UserModel and back.
-/// Only public methods are automatically registered.
-/// Password property should be ignored by "map.Validate()" method.
-/// </summary>
-internal class UserMapMethods
-{
-	[MapIgnoreProperty(nameof(to.Password))]
-	public void MapModelToUser(UserModel from, User to)
-	{
-		to.Id = from.Id;
-		to.Username = from.Username;
-	}
+var map = new Map()
+    // Registers all [Mapping] classes in the assembly
+    .RegisterMyProjectMappings() 
+    .RegisterFactory(type => /* your factory */);
 
-	[MapIgnoreProperty(nameof(to.Password))]
-	public UserModel MapUserToNewModel(User from) => new()
-	{
-		Id = from.Id,
-		Username = from.Username
-	};
-
-	[MapIgnoreMethod]
-	public Guid SomeMapToBeIgnored(UserModel from) => from.Id;
-}
-
-public class UserService
-{
-	private readonly IMap map;
-	private readonly IUser _repository = GetUserRepositoryFromSomewhere();
-
-	public UserService()
-	{
-		map = new Map();
-
-		// Register mapping methods.
-		// TODO: Move this code to application startup.
-		map.Register<UserMapMethods>();
-		map.RegisterFactory(type => IocContainer.Instance.Resolve(type));
-
-		// Validate mapping methods.
-		// It compares all properties in destination class and the properties used in map methods
-		// and throws an exception when some of them are missing.
-		// This method should be used only in unit tests.
-		map.Validate();
-	}
-
-	public void UpdateUserData(User user)
-	{
-		// Map a single object.
-		var model = map.From(user).To<UserModel>();
-		_repository.UpdateUserData(model);
-	}
-
-	public void UpdateUserData(User[] users)
-	{
-		// Map an IEnumerable of objects.
-		var models = map.From<User>(users).To<UserModel>();
-		_repository.UpdateUserData(models);
-	}
-}
+var user = map.From(userModel).To<User>();
 ```
 
-## When to use
-- When you want full control over your mappings.  
-- When other mappers approach is too "magical" for your needs.  
-- When you need a fast and lightweight but flexible solution.
+---
+
+## When to Use the Source Generator
+
+Use it if you want:
+
+* maximum performance
+* zero runtime overhead
+* compile-time safety
+* reduced boilerplate
+
+Manual mappings remain fully supported and interoperable.
+
+---
+
+## License
+
+MIT License
+
+---
+

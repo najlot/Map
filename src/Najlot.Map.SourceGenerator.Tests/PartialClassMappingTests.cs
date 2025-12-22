@@ -46,15 +46,8 @@ public class PartialClassMappingTests
 		var target = new TestUser() { CurrentSessionId = sessionId };
 
 		var map = new Map()
-			.Register<UserMappings>()
-			.RegisterFactory(t =>
-			{
-				if (t == typeof(TestUser)) return new TestUser();
-				if (t == typeof(TestUserFeature)) return new TestUserFeature();
-				if (t == typeof(TestUserAddress)) return new TestUserAddress();
-
-				throw new InvalidOperationException($"No factory registered for type {t.FullName}");
-			});
+			.RegisterNajlotMapSourceGeneratorTestsMappings()
+			.Register<UserMappings>();
 
 		// Act
 		map.From(source).To(target);
@@ -103,7 +96,7 @@ public partial class UserMappings
 	public static partial void MapAddress(IMap map, TestUserAddressModel from, TestUserAddress to);
 
 	// Additional mapping method for DateTimeOffset to DateTime
-	public DateTime MapOffsetToUtcDateTime(DateTimeOffset from) => from.UtcDateTime;
+	public static DateTime MapOffsetToUtcDateTime(DateTimeOffset from) => from.UtcDateTime;
 }
 
 [Mapping]

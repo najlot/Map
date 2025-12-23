@@ -1,4 +1,5 @@
 ﻿using Najlot.Map.Exceptions;
+using System.Linq.Expressions;
 
 namespace Najlot.Map;
 
@@ -11,6 +12,7 @@ public partial class Map : IMap
 	{
 		public Dictionary<Type, Delegate>? Maps;
 		public Dictionary<Type, Delegate>? Factories;
+		public Dictionary<Type, Expression>? Expressions;
 	}
 
 	private readonly Dictionary<Type, TypeRegistrations> _registrations = [];
@@ -145,6 +147,23 @@ public partial class Map : IMap
 		return new MapFromNullableAsyncEnumerable<T>(this, from, null, null);
 	}
 
+	/// <summary>
+	/// Maps from a queryable.
+	/// </summary>
+	/// <typeparam name="T">Type of source class</typeparam>
+	/// <param name="from">Queryable containing source classes</param>
+	/// <returns>Class to specify to which type to map</returns>
+	/// <exception cref="MapNotRegisteredException">Thrown when map is not registered.</exception>
+	public MapFromQueryable<T> From<T>(IQueryable<T> from)
+	{
+		if (_registrations.TryGetValue(typeof(T), out var regs))
+		{
+			return new MapFromQueryable<T>(from, regs.Expressions);
+		}
+
+		return new MapFromQueryable<T>(from, null);
+	}
+
 	public IMap Register<TFrom, TTo>(SimpleMapFactoryMethod<TFrom, TTo> method)
 	{
 		if (method is null)
@@ -168,6 +187,24 @@ public partial class Map : IMap
 
 		RegisterFactoryMapInternal(method);
 		_mapFactoryDelegates.Add(method);
+		return this;
+	}
+
+	public IMap RegisterExpression<TFrom, TTo>(Expression<Func<TFrom, TTo>> expression)
+	{
+		if (expression is null)
+		{
+			throw new ArgumentNullException(nameof(expression));
+		}
+
+		if (!_registrations.TryGetValue(typeof(TFrom), out var regs))
+		{
+			regs = new TypeRegistrations();
+			_registrations[typeof(TFrom)] = regs;
+		}
+
+		regs.Expressions ??= [];
+		regs.Expressions[typeof(TTo)] = expression;
 		return this;
 	}
 
@@ -293,6 +330,24 @@ public partial class Map : IMap
 					return to;
 				};
 			}
+		}
+
+		throw new MapNotRegisteredException(typeof(TFrom), typeof(TTo));
+	}
+
+	/// <summary>
+	/// Gets a registered map expression for the specified types.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <returns>The map expression if registered, otherwise null</returns>
+	public Expression<Func<TFrom, TTo>> GetExpression<TFrom, TTo>()
+	{
+		if (_registrations.TryGetValue(typeof(TFrom), out var regs)
+			&& regs.Expressions != null
+			&& regs.Expressions.TryGetValue(typeof(TTo), out var registration))
+		{
+			return (Expression<Func<TFrom, TTo>>)registration;
 		}
 
 		throw new MapNotRegisteredException(typeof(TFrom), typeof(TTo));

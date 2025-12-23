@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Najlot.Map;
 
@@ -38,6 +39,10 @@ public partial class Map
 			{
 				TryRegisterMapMethod(maps, method);
 			}
+			else if (IsExpressionType(method.ReturnType))
+			{
+				TryRegisterExpressionMethod(maps, method);
+			}
 			else
 			{
 				TryRegisterMapFactoryMethod(maps, method);
@@ -45,6 +50,34 @@ public partial class Map
 		}
 
 		return this;
+	}
+
+	private static bool IsExpressionType(Type type)
+	{
+		return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Expression<>);
+	}
+
+	private void TryRegisterExpressionMethod<T>(T maps, MethodInfo method)
+	{
+		var returnType = method.ReturnType;
+		var funcType = returnType.GetGenericArguments()[0];
+
+		if (!funcType.IsGenericType || funcType.GetGenericTypeDefinition() != typeof(Func<,>))
+		{
+			return;
+		}
+
+		var genericArgs = funcType.GetGenericArguments();
+		var fromType = genericArgs[0];
+		var toType = genericArgs[1];
+
+		var parameters = method.GetParameters();
+		if (parameters.Length == 0)
+		{
+			var registratorType = typeof(MapDelegateRegistrator<,>).MakeGenericType(fromType, toType);
+			var registrator = (IMapDelegateRegistrator)Activator.CreateInstance(registratorType)!;
+			registrator.RegisterExpression(maps, this, method);
+		}
 	}
 
 	private void TryRegisterMapFactoryMethod<T>(T maps, MethodInfo method)

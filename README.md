@@ -190,16 +190,67 @@ var user = map.From(userModel).To<User>();
 
 ---
 
-## When to Use the Source Generator
+## Expression-based mappings (LINQ projections)
 
-Use it if you want:
+When mapping inside `IQueryable<T>` (for example with Entity Framework Core), you often need an `Expression<Func<TFrom, TTo>>` so the provider can translate the projection to SQL.
 
-* maximum performance
-* zero runtime overhead
-* compile-time safety
-* reduced boilerplate
+Najlot.Map supports registering and using **expression mappings** in addition to delegate-based mappings.
 
-Manual mappings remain fully supported and interoperable.
+### Example
+
+```csharp
+using System;
+using System.Linq;
+using System.Linq.Expressions;
+using Najlot.Map.Attributes;
+
+public sealed class UserModel
+{
+    public Guid Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+public sealed class UserListItem
+{
+    public Guid Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public int AgeDays { get; set; }
+}
+
+[Mapping]
+public partial class UserMappings
+{
+    // Generated as an Expression<Func<UserModel, UserListItem>>
+    // Suitable for IQueryable projections.
+    public static partial Expression<Func<UserModel, UserListItem>> ToListItem();
+}
+```
+
+Usage with `IQueryable<T>`:
+
+```csharp
+var map = new Map()
+    .RegisterMyProjectMappings();
+
+// EF Core example: projection happens in SQL.
+var query = map.From(db.Users).To<UserListItem>();
+
+var items = await query.ToListAsync();
+```
+
+### Notes and limitations
+
+- `Expression` mappings are intended for **queryable projections** (e.g. EF Core). For in-memory objects, delegate mappings (`void Map(IMap map, TFrom from, TTo to)`) are usually the better default.
+- `Map.Validate()` **does not validate expression mappings**. Validation focuses on delegate-based mappings where the library can reliably track which properties are assigned.
+- For complex projections, expression trees can become harder to generate correctly.
+  In those cases it’s often best to **hand-write the expression** even if you use generated mappings elsewhere.
+
+  Practical reasons you might hand-write an expression:
+  - provider translation quirks (what EF Core can/can’t translate)
+  - computed values that need to stay server-side
+  - conditional projections, joins, groupings, or subqueries
+  - performance tuning of the generated SQL
 
 ---
 

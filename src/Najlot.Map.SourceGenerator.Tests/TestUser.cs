@@ -1,5 +1,19 @@
 namespace Najlot.Map.SourceGenerator.Tests;
 
+public enum TestUserStatus
+{
+	Active,
+	Inactive,
+	Banned,
+}
+
+public enum TestUserModelStatus
+{
+	Active,
+	Inactive,
+	Banned,
+}
+
 public class TestUser
 {
 	public int Id { get; set; }
@@ -13,6 +27,8 @@ public class TestUser
 	public List<TestUserFeature> Features { get; set; } = [];
 
 	public Guid CurrentSessionId { get; set; }
+
+	public TestUserStatus Status { get; set; }
 }
 
 public class TestUserAddress
@@ -40,6 +56,8 @@ public class TestUserModel
 	public TestUserAddressModel? Address { get; set; }
 
 	public List<TestUserFeatureModel> Features { get; set; } = [];
+
+	public TestUserModelStatus Status { get; set; }
 }
 
 public class TestUserFeatureModel

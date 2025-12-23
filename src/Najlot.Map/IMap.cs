@@ -1,4 +1,6 @@
-﻿namespace Najlot.Map;
+﻿using System.Linq.Expressions;
+
+namespace Najlot.Map;
 
 /// <summary>
 /// Map interface.
@@ -54,6 +56,14 @@ public interface IMap
 	MapFromNullableEnumerable<T> FromNullable<T>(IEnumerable<T?> from);
 
 	/// <summary>
+	/// Maps from a queryable.
+	/// </summary>
+	/// <typeparam name="T"></typeparam>
+	/// <param name="from"></param>
+	/// <returns></returns>
+	MapFromQueryable<T> From<T>(IQueryable<T> from);
+
+	/// <summary>
 	/// Registers a map delegate.
 	/// </summary>
 	/// <typeparam name="TFrom"></typeparam>
@@ -74,6 +84,15 @@ public interface IMap
 	IMap Register<TFrom, TTo>(SimpleMapFactoryMethod<TFrom, TTo> method);
 
 	IMap Register<TFrom, TTo>(MapFactoryMethod<TFrom, TTo> method);
+
+	/// <summary>
+	/// Registers a map expression.
+	/// </summary>
+	/// <typeparam name="TFrom"></typeparam>
+	/// <typeparam name="TTo"></typeparam>
+	/// <param name="expression"></param>
+	/// <returns></returns>
+	IMap RegisterExpression<TFrom, TTo>(Expression<Func<TFrom, TTo>> expression);
 
 	/// <summary>
 	/// Registers all public map delegates in a new class.
@@ -113,6 +132,14 @@ public interface IMap
 	/// <typeparam name="TTo">Destination type</typeparam>
 	/// <returns>The simple map factory method if registered, otherwise null</returns>
 	SimpleMapFactoryMethod<TFrom, TTo> GetFactoryMethod<TFrom, TTo>();
+
+	/// <summary>
+	/// Gets a registered map expression for the specified types.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <returns>The map expression if registered, otherwise null</returns>
+	Expression<Func<TFrom, TTo>> GetExpression<TFrom, TTo>();
 
 	/// <summary>
 	/// Creates a new instance of the specified type.

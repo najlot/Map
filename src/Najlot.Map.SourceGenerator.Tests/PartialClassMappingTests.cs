@@ -1,5 +1,4 @@
 using Najlot.Map.Attributes;
-using Najlot.Map.SourceGenerator;
 
 namespace Najlot.Map.SourceGenerator.Tests;
 
@@ -39,7 +38,8 @@ public class PartialClassMappingTests
 					FeatureCode = "F002",
 					FeatureName = "Feature 2"
 				}
-			]
+			],
+			Status = TestUserModelStatus.Inactive
 		};
 
 		var sessionId = Guid.NewGuid();
@@ -69,6 +69,7 @@ public class PartialClassMappingTests
 		Assert.Equal("12345", target.Address.ZipCode);
 		Assert.Equal(sessionId, target.CurrentSessionId);
 		Assert.Equal(registered.UtcDateTime, target.DateRegistered);
+		Assert.Equal(TestUserStatus.Inactive, target.Status);
 	}
 
 	[Fact]
@@ -97,6 +98,8 @@ public partial class UserMappings
 
 	// Additional mapping method for DateTimeOffset to DateTime
 	public static DateTime MapOffsetToUtcDateTime(DateTimeOffset from) => from.UtcDateTime;
+
+	public partial TestUserStatus MapUserStatus(TestUserModelStatus from);
 }
 
 [Mapping]

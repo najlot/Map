@@ -81,8 +81,22 @@ public interface IMap
 	/// <returns></returns>
 	IMap Register<TFrom, TTo>(SimpleMapMethod<TFrom, TTo> method);
 
+	/// <summary>
+	/// Registers a simple map factory delegate.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <param name="method">Factory delegate</param>
+	/// <returns>This instance</returns>
 	IMap Register<TFrom, TTo>(SimpleMapFactoryMethod<TFrom, TTo> method);
 
+	/// <summary>
+	/// Registers a map factory delegate.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <param name="method">Factory delegate</param>
+	/// <returns>This instance</returns>
 	IMap Register<TFrom, TTo>(MapFactoryMethod<TFrom, TTo> method);
 
 	/// <summary>

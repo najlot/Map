@@ -28,6 +28,17 @@ public readonly struct MapFromQueryable<TFrom>(
 		return from.Select(expression);
 	}
 
+	/// <summary>
+	/// Projects the source queryable and materializes the results as a list.
+	/// </summary>
+	/// <typeparam name="T">Destination element type</typeparam>
+	/// <returns>A list containing the projected results.</returns>
 	public readonly List<T> ToList<T>() => To<T>().ToList();
+
+	/// <summary>
+	/// Projects the source queryable and materializes the results as an array.
+	/// </summary>
+	/// <typeparam name="T">Destination element type</typeparam>
+	/// <returns>An array containing the projected results.</returns>
 	public readonly T[] ToArray<T>() => To<T>().ToArray();
 }

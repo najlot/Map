@@ -1,5 +1,4 @@
 ﻿using Najlot.Map.Tests.TestTypes;
-using System.Collections.Generic;
 
 namespace Najlot.Map.Tests;
 

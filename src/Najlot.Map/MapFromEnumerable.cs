@@ -50,20 +50,14 @@ public readonly struct MapFromEnumerable<TFrom>(
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	/// <returns></returns>
-	public T[] ToArray<T>()
-	{
-		return To<T>().ToArray();
-	}
+	public T[] ToArray<T>() => To<T>().ToArray();
 
 	/// <summary>
 	/// Maps provided IEnumerable to a List.
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
 	/// <returns></returns>
-	public List<T> ToList<T>()
-	{
-		return To<T>().ToList();
-	}
+	public List<T> ToList<T>() => To<T>().ToList();
 
 	/// <summary>
 	/// Maps provided IEnumerable into an existing List.

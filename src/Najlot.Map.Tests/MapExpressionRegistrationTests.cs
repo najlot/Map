@@ -1,6 +1,5 @@
 using Najlot.Map.Tests.TestTypes;
 using System.Linq.Expressions;
-using Xunit;
 
 namespace Najlot.Map.Tests;
 

@@ -19,6 +19,10 @@ public partial class Map
 			   (method.DeclaringType != null && method.DeclaringType.CustomAttributes.Any(a => a.AttributeType == typeof(MapValidateSourceAttribute)));
 	}
 
+	/// <summary>
+	/// Validates all registered mappings and throws when required properties are not mapped or ignored.
+	/// </summary>
+	/// <exception cref="MapMissPropertiesException">Thrown when one or more mappings leave required properties unmapped.</exception>
 	public void Validate()
 	{
 		var sb = new StringBuilder();

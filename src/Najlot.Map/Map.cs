@@ -164,6 +164,13 @@ public partial class Map : IMap
 		return new MapFromQueryable<T>(from, null);
 	}
 
+	/// <summary>
+	/// Registers a simple map factory delegate.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <param name="method">Factory delegate</param>
+	/// <returns>This instance</returns>
 	public IMap Register<TFrom, TTo>(SimpleMapFactoryMethod<TFrom, TTo> method)
 	{
 		if (method is null)
@@ -178,6 +185,13 @@ public partial class Map : IMap
 		return this;
 	}
 
+	/// <summary>
+	/// Registers a map factory delegate.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <param name="method">Factory delegate</param>
+	/// <returns>This instance</returns>
 	public IMap Register<TFrom, TTo>(MapFactoryMethod<TFrom, TTo> method)
 	{
 		if (method is null)
@@ -190,6 +204,13 @@ public partial class Map : IMap
 		return this;
 	}
 
+	/// <summary>
+	/// Registers a map expression.
+	/// </summary>
+	/// <typeparam name="TFrom">Source type</typeparam>
+	/// <typeparam name="TTo">Destination type</typeparam>
+	/// <param name="expression">Projection expression</param>
+	/// <returns>This instance</returns>
 	public IMap RegisterExpression<TFrom, TTo>(Expression<Func<TFrom, TTo>> expression)
 	{
 		if (expression is null)

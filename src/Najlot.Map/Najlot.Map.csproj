@@ -7,7 +7,7 @@
 		<LangVersion>latest</LangVersion>
 		<IsPackable>true</IsPackable>
 		<Title>Map</Title>
-		<Version>0.1.2</Version>
+		<Version>0.2.0</Version>
 		<Authors>Najlot</Authors>
 		<Description>Map is a simple library to manage mapping methods.</Description>
 		<PackageProjectUrl>https://github.com/najlot/Map</PackageProjectUrl>
@@ -16,6 +16,8 @@
 		<PackageTags>map;mapper;mapping;najlot</PackageTags>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<DocumentationFile>$(OutputPath)$(AssemblyName).xml</DocumentationFile>
 	</PropertyGroup>
 
 	<ItemGroup>

@@ -1,7 +1,5 @@
 using Najlot.Map.Exceptions;
 using Najlot.Map.Tests.TestTypes;
-using System.Linq;
-using Xunit;
 
 namespace Najlot.Map.Tests;
 

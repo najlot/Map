@@ -2,6 +2,9 @@
 
 namespace Najlot.Map;
 
+/// <summary>
+/// Maps from a nullable async enumerable.
+/// </summary>
 public readonly struct MapFromNullableAsyncEnumerable<TFrom>(
 	Map map,
 	IAsyncEnumerable<TFrom?> from,

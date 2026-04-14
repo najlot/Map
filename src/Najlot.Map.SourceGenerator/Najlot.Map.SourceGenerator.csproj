@@ -7,7 +7,7 @@
 		<LangVersion>latest</LangVersion>
 		<IsPackable>true</IsPackable>
 		<Title>Najlot.Map.SourceGenerator</Title>
-		<Version>0.2.0</Version>
+		<Version>0.2.1</Version>
 		<Authors>Najlot</Authors>
 		<Description>Source generator for Najlot.Map that provides automatic mapping code generation.</Description>
 		<PackageProjectUrl>https://github.com/najlot/Map</PackageProjectUrl>
@@ -18,6 +18,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
 		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
 		<IsRoslynComponent>true</IsRoslynComponent>
 	</PropertyGroup>
 

@@ -431,20 +431,44 @@ public class MappingGenerator : IIncrementalGenerator
 	{
 		var sourcePropertyType = sourceProperty.Type;
 		var targetPropertyType = targetProperty.Type;
+		var useCreateFallback = RequiresCreateFallback(sourceProperty, targetProperty, mapParamName);
+		var targetTypeForFactory = GetTypeForFactory(targetPropertyType);
 
 		// Check if the types can be directly assigned
 		if (CanDirectlyAssign(sourcePropertyType, targetPropertyType))
 		{
-			// Direct assignment for simple types
-			sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {sourceParamName}.{sourceProperty.Name};");
+			if (useCreateFallback)
+			{
+				var fallbackValue = GetFallbackValueExpression(mapParamName!, targetPropertyType, targetTypeForFactory);
+				sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {sourceParamName}.{sourceProperty.Name} ?? {fallbackValue};");
+			}
+			else
+			{
+				// Direct assignment for simple types
+				sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {sourceParamName}.{sourceProperty.Name};");
+			}
 		}
 		else
 		{
 			// Check for custom mapping method in the containing class
 			if (customMappingLookup.TryGetValue((sourcePropertyType, targetPropertyType), out var customMapMethod))
 			{
-				// Use custom mapping method
-				sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {customMapMethod.Name}({sourceParamName}.{sourceProperty.Name});");
+				if (useCreateFallback)
+				{
+					sb.AppendLine($"{indent}        if ({sourceParamName}.{sourceProperty.Name} != null)");
+					sb.AppendLine($"{indent}        {{");
+					sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = {customMapMethod.Name}({sourceParamName}.{sourceProperty.Name});");
+					sb.AppendLine($"{indent}        }}");
+					sb.AppendLine($"{indent}        else");
+					sb.AppendLine($"{indent}        {{");
+					sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = {GetFallbackValueExpression(mapParamName!, targetPropertyType, targetTypeForFactory)};");
+					sb.AppendLine($"{indent}        }}");
+				}
+				else
+				{
+					// Use custom mapping method
+					sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {customMapMethod.Name}({sourceParamName}.{sourceProperty.Name});");
+				}
 			}
 			else if (mapParamName != null)
 			{
@@ -457,20 +481,37 @@ public class MappingGenerator : IIncrementalGenerator
 					if (sourceElementType is not null && targetElementType is not null)
 					{
 						var targetTypeName = targetPropertyType.ToDisplayString();
+						string collectionAssignment;
 
 						// Determine which method to call based on the target type
 						if (targetTypeName.Contains("List<"))
 						{
-							sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToList<{targetElementType.ToDisplayString()}>();");
+							collectionAssignment = $"{mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToList<{targetElementType.ToDisplayString()}>()";
 						}
 						else if (targetTypeName.Contains("[]"))
 						{
-							sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToArray<{targetElementType.ToDisplayString()}>();");
+							collectionAssignment = $"{mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).ToArray<{targetElementType.ToDisplayString()}>()";
 						}
 						else
 						{
 							// Default to To<T>() for IEnumerable<T>
-							sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).To<{targetElementType.ToDisplayString()}>();");
+							collectionAssignment = $"{mapParamName}.From<{sourceElementType.ToDisplayString()}>({sourceParamName}.{sourceProperty.Name}).To<{targetElementType.ToDisplayString()}>()";
+						}
+
+						if (useCreateFallback)
+						{
+							sb.AppendLine($"{indent}        if ({sourceParamName}.{sourceProperty.Name} != null)");
+							sb.AppendLine($"{indent}        {{");
+							sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = {collectionAssignment};");
+							sb.AppendLine($"{indent}        }}");
+							sb.AppendLine($"{indent}        else");
+							sb.AppendLine($"{indent}        {{");
+							sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = {GetFallbackValueExpression(mapParamName!, targetPropertyType, targetTypeForFactory)};");
+							sb.AppendLine($"{indent}        }}");
+						}
+						else
+						{
+							sb.AppendLine($"{indent}        {targetParamName}.{targetProperty.Name} = {collectionAssignment};");
 						}
 					}
 				}
@@ -485,10 +526,6 @@ public class MappingGenerator : IIncrementalGenerator
 					else
 					{
 						// For reference types (objects), handle null properly and use factory if available
-						var targetTypeDisplayString = targetPropertyType.ToDisplayString();
-						// Remove nullable annotation for type parameter
-						var targetTypeForFactory = targetTypeDisplayString.TrimEnd('?');
-
 						sb.AppendLine($"{indent}        if ({sourceParamName}.{sourceProperty.Name} != null)");
 						sb.AppendLine($"{indent}        {{");
 						sb.AppendLine($"{indent}            if ({targetParamName}.{targetProperty.Name} == null)");
@@ -502,12 +539,61 @@ public class MappingGenerator : IIncrementalGenerator
 						sb.AppendLine($"{indent}        }}");
 						sb.AppendLine($"{indent}        else");
 						sb.AppendLine($"{indent}        {{");
-						sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = null;");
+						if (IsNonNullableReferenceProperty(targetProperty))
+						{
+							sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = {GetFallbackValueExpression(mapParamName!, targetPropertyType, targetTypeForFactory)};");
+						}
+						else
+						{
+							sb.AppendLine($"{indent}            {targetParamName}.{targetProperty.Name} = null;");
+						}
 						sb.AppendLine($"{indent}        }}");
 					}
 				}
 			}
 		}
+	}
+
+	private static bool RequiresCreateFallback(IPropertySymbol sourceProperty, IPropertySymbol targetProperty, string? mapParamName)
+	{
+		return mapParamName is not null
+			&& IsNullableReferenceProperty(sourceProperty)
+			&& IsNonNullableReferenceProperty(targetProperty);
+	}
+
+	private static bool IsNullableReferenceProperty(IPropertySymbol property)
+	{
+		return property.Type.IsReferenceType && property.NullableAnnotation == NullableAnnotation.Annotated;
+	}
+
+	private static bool IsNonNullableReferenceProperty(IPropertySymbol property)
+	{
+		return property.Type.IsReferenceType && property.NullableAnnotation == NullableAnnotation.NotAnnotated;
+	}
+
+	private static bool IsStringType(ITypeSymbol type)
+	{
+		return type.SpecialType == SpecialType.System_String;
+	}
+
+	private static string GetFallbackValueExpression(string mapParamName, ITypeSymbol targetPropertyType, string targetTypeForFactory)
+	{
+		if (IsStringType(targetPropertyType))
+		{
+			return "string.Empty";
+		}
+
+		if (targetPropertyType is IArrayTypeSymbol arrayType)
+		{
+			return $"System.Array.Empty<{arrayType.ElementType.ToDisplayString()}>()";
+		}
+
+		return $"{mapParamName}.Create<{targetTypeForFactory}>()";
+	}
+
+	private static string GetTypeForFactory(ITypeSymbol type)
+	{
+		return type.ToDisplayString().TrimEnd('?');
 	}
 
 	private static IReadOnlyDictionary<(ITypeSymbol Source, ITypeSymbol Target), IMethodSymbol> CreateCustomMappingLookup(INamedTypeSymbol containingType, bool isStaticContext)
@@ -848,3 +934,4 @@ internal sealed class TypePairComparer : IEqualityComparer<(ITypeSymbol Source, 
 		}
 	}
 }
+
